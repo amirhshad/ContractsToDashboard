@@ -1,13 +1,21 @@
 """Vercel serverless function entry point for FastAPI backend."""
 
-import sys
-import os
+from http.server import BaseHTTPRequestHandler
+import json
 
-# Add the project root to the path so we can import backend modules
-sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+class handler(BaseHTTPRequestHandler):
+    def do_GET(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.end_headers()
+        message = {"status": "ok", "message": "API is working", "path": self.path}
+        self.wfile.write(json.dumps(message).encode())
+        return
 
-from mangum import Mangum
-from backend.main import app
-
-# Create the handler for Vercel/AWS Lambda
-handler = Mangum(app, lifespan="off")
+    def do_POST(self):
+        self.send_response(200)
+        self.send_header('Content-type', 'application/json')
+        self.end_headers()
+        message = {"status": "ok", "message": "POST received", "path": self.path}
+        self.wfile.write(json.dumps(message).encode())
+        return
