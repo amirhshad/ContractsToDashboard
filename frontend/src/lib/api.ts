@@ -1,7 +1,7 @@
 import { supabase } from './supabase'
 import type { Contract, ContractSummary, ExtractionResult, Recommendation } from '../types'
 
-const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+const API_URL = import.meta.env.VITE_API_URL || ''
 
 async function getAuthHeader(): Promise<Record<string, string>> {
   const { data: { session } } = await supabase.auth.getSession()
