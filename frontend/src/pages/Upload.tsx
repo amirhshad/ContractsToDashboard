@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Upload as UploadIcon, FileText, X, Check, AlertCircle } from 'lucide-react'
+import { Upload as UploadIcon, FileText, AlertCircle } from 'lucide-react'
 import { extractContract, confirmContract } from '../lib/api'
 import type { ExtractionResult } from '../types'
 import ExtractionReview from '../components/ExtractionReview'

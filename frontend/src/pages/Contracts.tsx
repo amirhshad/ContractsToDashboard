@@ -1,7 +1,6 @@
 import { useState } from 'react'
-import { FileText, Trash2, ExternalLink, Search, Filter } from 'lucide-react'
+import { FileText, Trash2, Search, Filter } from 'lucide-react'
 import { useContracts } from '../hooks/useContracts'
-import type { Contract } from '../types'
 
 export default function Contracts() {
   const { contracts, loading, error, deleteContract } = useContracts()

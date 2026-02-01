@@ -15,7 +15,7 @@ import type { Recommendation } from '../types'
 import RecommendationCard from '../components/RecommendationCard'
 
 export default function Dashboard() {
-  const { contracts, summary, loading, error, refetch } = useContracts()
+  const { contracts, summary, loading, error } = useContracts()
   const [recommendations, setRecommendations] = useState<Recommendation[]>([])
   const [loadingRecs, setLoadingRecs] = useState(false)
   const [generatingRecs, setGeneratingRecs] = useState(false)
