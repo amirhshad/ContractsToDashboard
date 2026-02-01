@@ -88,6 +88,133 @@ The system supports event-driven execution via Modal webhooks. Each webhook maps
 
 **All webhook activity streams to Slack in real-time.**
 
+## MCP Servers (Model Context Protocol)
+
+MCP servers extend Claude's capabilities by providing direct integrations with external services. The following are configured:
+
+### Supabase MCP
+Provides direct database access and management for Supabase projects.
+
+**Installation command used:**
+```bash
+claude mcp add supabase -s user -- npx -y @supabase/mcp-server-supabase --access-token YOUR_ACCESS_TOKEN
+```
+
+**Capabilities:**
+- Query and manage database tables
+- Execute SQL (read/write unless `--read-only` flag is set)
+- Manage database schema
+- Access all projects in the org (or scoped to one with `--project-ref`)
+
+**Usage:** Ask natural language questions like "What tables are in my database?" and Claude will use the MCP tools automatically.
+
+**Management commands:**
+```bash
+claude mcp list                    # List all configured MCP servers
+claude mcp remove supabase -s user # Remove the Supabase MCP
+```
+
+**Security notes:**
+- Access token is stored in `~/.claude.json`
+- For production, use `--read-only` flag to prevent write operations
+- Scope to specific project with `--project-ref YOUR_PROJECT_REF`
+
+**Docs:** https://supabase.com/docs/guides/getting-started/mcp
+
+### Other Available MCPs
+These are available in the current Claude Code environment:
+- **Hugging Face** - ML models, datasets, papers, spaces
+- **Todoist** - Task and project management
+- **Context7** - Library documentation lookup
+- **Playwright** - Browser automation
+
+## Contract Optimizer Dashboard
+
+This project is a full-stack application for managing contracts and getting AI-powered cost optimization recommendations.
+
+### Tech Stack
+
+**Frontend:**
+- React + TypeScript + Vite
+- Tailwind CSS for styling
+- Supabase Auth for authentication
+- Located in `frontend/`
+
+**Backend:**
+- Python serverless functions on Vercel
+- Supabase PostgreSQL database with Row Level Security
+- Supabase Storage for PDF files
+- Anthropic Claude API for PDF extraction
+- API handler in `api/index.py`
+
+**Database Tables:**
+- `contracts` - User contracts with provider, costs, dates, etc.
+- `recommendations` - AI-generated cost optimization recommendations
+
+### Deployment
+
+**Live URL:** https://contracts-dashboard.vercel.app
+
+**GitHub:** https://github.com/amirhshad/ContractsToDashboard
+
+**Deploy commands:**
+```bash
+vercel --prod --yes          # Deploy to Vercel
+git push origin main         # Push to GitHub (auto-deploy if connected)
+```
+
+**Environment Variables (Vercel):**
+- `SUPABASE_URL` - Supabase project URL
+- `SUPABASE_ANON_KEY` - Supabase anonymous key
+- `SUPABASE_SERVICE_KEY` - Supabase service role key (for backend)
+- `ANTHROPIC_API_KEY` - Claude API key
+- `VITE_SUPABASE_URL` - Frontend Supabase URL
+- `VITE_SUPABASE_ANON_KEY` - Frontend Supabase key
+
+### Local Development
+
+**Backend:**
+```bash
+cd backend
+python3.10 -m uvicorn backend.main:app --reload --port 8000
+```
+
+**Frontend:**
+```bash
+cd frontend
+npm install
+npm run dev
+```
+
+**Important:** The `frontend/.env` should NOT include `VITE_API_URL` for production builds. The frontend uses relative URLs (`/api/...`) which work on both local dev and Vercel.
+
+### Key Files
+
+- `api/index.py` - Vercel serverless API (all endpoints)
+- `frontend/src/lib/api.ts` - Frontend API client
+- `frontend/src/lib/supabase.ts` - Supabase client setup
+- `vercel.json` - Vercel deployment configuration
+- `.vercelignore` - Files to exclude from Vercel deployment
+- `supabase/migrations/` - Database migration SQL files
+
+### API Endpoints
+
+- `GET /api/health` - Health check
+- `GET /api/contracts` - List user contracts
+- `GET /api/contracts/summary` - Dashboard summary stats
+- `GET /api/contracts/:id` - Get single contract
+- `DELETE /api/contracts/:id` - Delete contract
+- `POST /api/upload/extract` - Extract data from PDF using Claude
+- `POST /api/upload/confirm` - Save confirmed contract
+- `GET /api/recommendations` - List recommendations
+
+### Notes
+
+- Vercel's Python runtime doesn't support FastAPI/ASGI well, so we use a basic HTTP handler
+- All authenticated endpoints require `Authorization: Bearer <token>` header
+- PDFs are processed using Claude's document vision capability
+- The `.vercelignore` file prevents local `.env` files from being deployed
+
 ## Summary
 
 You sit between human intent (directives) and deterministic execution (Python scripts). Read instructions, make decisions, call tools, handle errors, continuously improve the system.
