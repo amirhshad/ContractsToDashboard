@@ -1,0 +1,131 @@
+import { supabase } from './supabase'
+import type { Contract, ContractSummary, ExtractionResult, Recommendation } from '../types'
+
+const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
+async function getAuthHeader(): Promise<Record<string, string>> {
+  const { data: { session } } = await supabase.auth.getSession()
+  if (!session?.access_token) {
+    throw new Error('Not authenticated')
+  }
+  return {
+    'Authorization': `Bearer ${session.access_token}`,
+  }
+}
+
+// Contracts API
+export async function getContracts(): Promise<Contract[]> {
+  const headers = await getAuthHeader()
+  const res = await fetch(`${API_URL}/api/contracts`, { headers })
+  if (!res.ok) throw new Error('Failed to fetch contracts')
+  return res.json()
+}
+
+export async function getContract(id: string): Promise<Contract> {
+  const headers = await getAuthHeader()
+  const res = await fetch(`${API_URL}/api/contracts/${id}`, { headers })
+  if (!res.ok) throw new Error('Failed to fetch contract')
+  return res.json()
+}
+
+export async function getContractSummary(): Promise<ContractSummary> {
+  const headers = await getAuthHeader()
+  const res = await fetch(`${API_URL}/api/contracts/summary`, { headers })
+  if (!res.ok) throw new Error('Failed to fetch summary')
+  return res.json()
+}
+
+export async function updateContract(id: string, data: Partial<Contract>): Promise<Contract> {
+  const headers = await getAuthHeader()
+  const res = await fetch(`${API_URL}/api/contracts/${id}`, {
+    method: 'PUT',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  })
+  if (!res.ok) throw new Error('Failed to update contract')
+  return res.json()
+}
+
+export async function deleteContract(id: string): Promise<void> {
+  const headers = await getAuthHeader()
+  const res = await fetch(`${API_URL}/api/contracts/${id}`, {
+    method: 'DELETE',
+    headers,
+  })
+  if (!res.ok) throw new Error('Failed to delete contract')
+}
+
+// Upload API
+export async function extractContract(file: File): Promise<ExtractionResult> {
+  const headers = await getAuthHeader()
+  const formData = new FormData()
+  formData.append('file', file)
+
+  const res = await fetch(`${API_URL}/api/upload/extract`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  })
+  if (!res.ok) throw new Error('Failed to extract contract')
+  return res.json()
+}
+
+export async function confirmContract(
+  file: File,
+  data: Partial<ExtractionResult>
+): Promise<Contract> {
+  const headers = await getAuthHeader()
+  const formData = new FormData()
+  formData.append('file', file)
+
+  // Add extraction data as query params
+  const params = new URLSearchParams()
+  if (data.provider_name) params.append('provider_name', data.provider_name)
+  if (data.contract_type) params.append('contract_type', data.contract_type)
+  if (data.monthly_cost) params.append('monthly_cost', String(data.monthly_cost))
+  if (data.annual_cost) params.append('annual_cost', String(data.annual_cost))
+  if (data.start_date) params.append('start_date', data.start_date)
+  if (data.end_date) params.append('end_date', data.end_date)
+  if (data.auto_renewal !== undefined) params.append('auto_renewal', String(data.auto_renewal))
+  if (data.cancellation_notice_days) params.append('cancellation_notice_days', String(data.cancellation_notice_days))
+
+  const res = await fetch(`${API_URL}/api/upload/confirm?${params}`, {
+    method: 'POST',
+    headers,
+    body: formData,
+  })
+  if (!res.ok) throw new Error('Failed to save contract')
+  return res.json()
+}
+
+// Recommendations API
+export async function getRecommendations(): Promise<Recommendation[]> {
+  const headers = await getAuthHeader()
+  const res = await fetch(`${API_URL}/api/recommendations`, { headers })
+  if (!res.ok) throw new Error('Failed to fetch recommendations')
+  return res.json()
+}
+
+export async function generateRecommendations(): Promise<Recommendation[]> {
+  const headers = await getAuthHeader()
+  const res = await fetch(`${API_URL}/api/recommendations/generate`, {
+    method: 'POST',
+    headers,
+  })
+  if (!res.ok) throw new Error('Failed to generate recommendations')
+  return res.json()
+}
+
+export async function updateRecommendation(
+  id: string,
+  status: 'accepted' | 'dismissed'
+): Promise<Recommendation> {
+  const headers = await getAuthHeader()
+  const res = await fetch(`${API_URL}/api/recommendations/${id}`, {
+    method: 'PUT',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  })
+  if (!res.ok) throw new Error('Failed to update recommendation')
+  return res.json()
+}
