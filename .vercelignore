@@ -1,0 +1,13 @@
+# Ignore local environment files
+.env
+frontend/.env
+.env.local
+.env.*.local
+
+# Other ignores
+__pycache__
+*.pyc
+node_modules
+.git
+*.pdf
+.mcp.json
