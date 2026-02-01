@@ -1,6 +1,7 @@
-"""Minimal FastAPI test for Vercel."""
+"""Minimal FastAPI test for Vercel using Mangum."""
 
 from fastapi import FastAPI
+from mangum import Mangum
 
 app = FastAPI()
 
@@ -12,5 +13,5 @@ async def root():
 async def health():
     return {"status": "ok"}
 
-# Export for Vercel
-handler = app
+# Mangum handler for AWS Lambda/Vercel
+handler = Mangum(app, lifespan="off")
