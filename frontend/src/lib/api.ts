@@ -127,6 +127,8 @@ export async function confirmContracts(
   if (data.auto_renewal !== undefined) params.append('auto_renewal', String(data.auto_renewal))
   if (data.cancellation_notice_days) params.append('cancellation_notice_days', String(data.cancellation_notice_days))
   if (data.key_terms && data.key_terms.length > 0) params.append('key_terms', JSON.stringify(data.key_terms))
+  if (data.parties && data.parties.length > 0) params.append('parties', JSON.stringify(data.parties))
+  if (data.risks && data.risks.length > 0) params.append('risks', JSON.stringify(data.risks))
 
   const res = await fetch(`${API_URL}/api/upload/confirm?${params}`, {
     method: 'POST',

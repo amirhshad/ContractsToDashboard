@@ -106,6 +106,19 @@ Analyze ALL provided documents together and extract a UNIFIED view of the contra
     "auto_renewal": true or false (from main agreement or as overridden by amendments),
     "cancellation_notice_days": "Number of days notice required or null",
     "key_terms": ["List of important terms from ALL documents"],
+    "parties": [
+        {
+            "name": "Full legal name of the party",
+            "role": "Role in contract: provider, client, insurer, insured, landlord, tenant, licensor, licensee, etc."
+        }
+    ],
+    "risks": [
+        {
+            "title": "Short risk title",
+            "description": "Description of the risk or concern",
+            "severity": "high, medium, or low"
+        }
+    ],
     "confidence": 0.0-1.0 confidence score,
     "documents_analyzed": [
         {
@@ -120,6 +133,8 @@ IMPORTANT:
 - If documents have conflicting terms, note the conflict in key_terms and use the most recent/specific version
 - Amendments and SOWs typically override terms in the main agreement
 - Combine costs if multiple SOWs/schedules specify separate fees
+- For parties: Extract ALL parties mentioned (typically 2+), identify their roles clearly
+- For risks: Identify potential risks like auto-renewal traps, unfavorable terms, liability issues, termination penalties, etc.
 - Return ONLY the JSON object, no additional text."""
 
 
@@ -362,13 +377,27 @@ class handler(BaseHTTPRequestHandler):
                 if len(files) > MAX_FILES_PER_CONTRACT:
                     return self.send_error_json(f"Maximum {MAX_FILES_PER_CONTRACT} files allowed per contract", 400)
 
-                # Parse key_terms from JSON string
+                # Parse JSON fields from query params
                 key_terms = None
                 if params.get("key_terms"):
                     try:
                         key_terms = json.loads(params["key_terms"])
                     except json.JSONDecodeError:
                         key_terms = None
+
+                parties = None
+                if params.get("parties"):
+                    try:
+                        parties = json.loads(params["parties"])
+                    except json.JSONDecodeError:
+                        parties = None
+
+                risks = None
+                if params.get("risks"):
+                    try:
+                        risks = json.loads(params["risks"])
+                    except json.JSONDecodeError:
+                        risks = None
 
                 # Create contract record first (without file_path/file_name for multi-file)
                 contract_data = {
@@ -382,6 +411,8 @@ class handler(BaseHTTPRequestHandler):
                     "auto_renewal": params.get("auto_renewal", "true").lower() == "true",
                     "cancellation_notice_days": int(params["cancellation_notice_days"]) if params.get("cancellation_notice_days") else None,
                     "key_terms": key_terms,
+                    "parties": parties,
+                    "risks": risks,
                     "user_verified": True,
                 }
 

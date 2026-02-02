@@ -1,0 +1,305 @@
+import { useState, useEffect } from 'react'
+import { useParams, useNavigate, Link } from 'react-router-dom'
+import {
+  ArrowLeft,
+  Users,
+  FileText,
+  AlertTriangle,
+  Calendar,
+  DollarSign,
+  Building,
+  RefreshCw,
+  Clock
+} from 'lucide-react'
+import { getContract, getContracts } from '../lib/api'
+import type { Contract, ContractParty, ContractRisk } from '../types'
+
+export default function ContractDetail() {
+  const { id } = useParams<{ id: string }>()
+  const navigate = useNavigate()
+  const [contract, setContract] = useState<Contract | null>(null)
+  const [contracts, setContracts] = useState<Contract[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [selectedContractId, setSelectedContractId] = useState<string>(id || '')
+
+  useEffect(() => {
+    loadContracts()
+  }, [])
+
+  useEffect(() => {
+    if (selectedContractId) {
+      loadContract(selectedContractId)
+    }
+  }, [selectedContractId])
+
+  const loadContracts = async () => {
+    try {
+      const data = await getContracts()
+      setContracts(data)
+      if (!id && data.length > 0) {
+        setSelectedContractId(data[0].id)
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load contracts')
+    }
+  }
+
+  const loadContract = async (contractId: string) => {
+    try {
+      setLoading(true)
+      setError(null)
+      const data = await getContract(contractId)
+      setContract(data)
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to load contract')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const formatDate = (date: string | null) => {
+    if (!date) return 'Not specified'
+    return new Date(date).toLocaleDateString()
+  }
+
+  const formatCurrency = (amount: number | null) => {
+    if (amount === null) return 'Not specified'
+    return `$${amount.toLocaleString()}`
+  }
+
+  const getSeverityColor = (severity: string) => {
+    switch (severity) {
+      case 'high':
+        return 'bg-red-100 text-red-800 border-red-200'
+      case 'medium':
+        return 'bg-yellow-100 text-yellow-800 border-yellow-200'
+      case 'low':
+        return 'bg-green-100 text-green-800 border-green-200'
+      default:
+        return 'bg-gray-100 text-gray-800 border-gray-200'
+    }
+  }
+
+  const parties: ContractParty[] = contract?.parties || []
+  const risks: ContractRisk[] = contract?.risks || []
+  const keyTerms: string[] = contract?.key_terms || []
+
+  return (
+    <div className="max-w-5xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Link
+            to="/contracts"
+            className="p-2 hover:bg-gray-100 rounded-md transition-colors"
+          >
+            <ArrowLeft className="w-5 h-5 text-gray-600" />
+          </Link>
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900">Contract Analysis</h1>
+            <p className="text-gray-600">View parties, key terms, and risks</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Contract Selector */}
+      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <label className="block text-sm font-medium text-gray-700 mb-2">
+          Select Contract
+        </label>
+        <select
+          value={selectedContractId}
+          onChange={(e) => {
+            setSelectedContractId(e.target.value)
+            navigate(`/contracts/${e.target.value}/analysis`, { replace: true })
+          }}
+          className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
+        >
+          <option value="">Choose a contract...</option>
+          {contracts.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.provider_name} - {c.contract_type || 'Unknown type'}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {loading && selectedContractId && (
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary-600"></div>
+        </div>
+      )}
+
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+          {error}
+        </div>
+      )}
+
+      {contract && !loading && (
+        <>
+          {/* Contract Overview */}
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center gap-3 mb-4">
+              <Building className="w-6 h-6 text-primary-600" />
+              <h2 className="text-xl font-semibold text-gray-900">{contract.provider_name}</h2>
+              <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 capitalize">
+                {contract.contract_type || 'Unknown'}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-gray-400" />
+                <div>
+                  <p className="text-xs text-gray-500">Monthly Cost</p>
+                  <p className="font-medium">{formatCurrency(contract.monthly_cost)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-gray-400" />
+                <div>
+                  <p className="text-xs text-gray-500">Start Date</p>
+                  <p className="font-medium">{formatDate(contract.start_date)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Calendar className="w-4 h-4 text-gray-400" />
+                <div>
+                  <p className="text-xs text-gray-500">End Date</p>
+                  <p className="font-medium">{formatDate(contract.end_date)}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <RefreshCw className="w-4 h-4 text-gray-400" />
+                <div>
+                  <p className="text-xs text-gray-500">Auto-Renewal</p>
+                  <p className="font-medium">{contract.auto_renewal ? 'Yes' : 'No'}</p>
+                </div>
+              </div>
+            </div>
+
+            {contract.cancellation_notice_days && (
+              <div className="mt-4 flex items-center gap-2 text-sm text-gray-600">
+                <Clock className="w-4 h-4" />
+                <span>{contract.cancellation_notice_days} days cancellation notice required</span>
+              </div>
+            )}
+          </div>
+
+          {/* Three Column Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Parties */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <Users className="w-5 h-5 text-primary-600" />
+                <h3 className="font-semibold text-gray-900">Parties</h3>
+                <span className="ml-auto text-sm text-gray-500">{parties.length}</span>
+              </div>
+
+              {parties.length === 0 ? (
+                <p className="text-gray-500 text-sm">No parties extracted. Re-upload the contract to extract party information.</p>
+              ) : (
+                <div className="space-y-3">
+                  {parties.map((party, index) => (
+                    <div key={index} className="border-l-2 border-primary-200 pl-3 py-1">
+                      <p className="font-medium text-gray-900">{party.name}</p>
+                      <p className="text-sm text-gray-500 capitalize">{party.role}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Key Terms */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <FileText className="w-5 h-5 text-primary-600" />
+                <h3 className="font-semibold text-gray-900">Key Terms</h3>
+                <span className="ml-auto text-sm text-gray-500">{keyTerms.length}</span>
+              </div>
+
+              {keyTerms.length === 0 ? (
+                <p className="text-gray-500 text-sm">No key terms extracted.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {keyTerms.map((term, index) => (
+                    <li key={index} className="flex items-start gap-2">
+                      <span className="w-1.5 h-1.5 rounded-full bg-primary-500 mt-2 flex-shrink-0"></span>
+                      <span className="text-sm text-gray-700">{term}</span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+
+            {/* Risks */}
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <AlertTriangle className="w-5 h-5 text-primary-600" />
+                <h3 className="font-semibold text-gray-900">Risks</h3>
+                <span className="ml-auto text-sm text-gray-500">{risks.length}</span>
+              </div>
+
+              {risks.length === 0 ? (
+                <p className="text-gray-500 text-sm">No risks identified. Re-upload the contract to analyze risks.</p>
+              ) : (
+                <div className="space-y-3">
+                  {risks.map((risk, index) => (
+                    <div
+                      key={index}
+                      className={`p-3 rounded-md border ${getSeverityColor(risk.severity)}`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="font-medium text-sm">{risk.title}</p>
+                        <span className="text-xs uppercase font-semibold">{risk.severity}</span>
+                      </div>
+                      <p className="text-xs">{risk.description}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Documents */}
+          {contract.files && contract.files.length > 0 && (
+            <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+              <div className="flex items-center gap-2 mb-4">
+                <FileText className="w-5 h-5 text-primary-600" />
+                <h3 className="font-semibold text-gray-900">Documents</h3>
+                <span className="ml-auto text-sm text-gray-500">{contract.files.length} files</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                {contract.files.map((file) => (
+                  <div key={file.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-md">
+                    <FileText className="w-5 h-5 text-gray-400" />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 truncate">{file.file_name}</p>
+                      <p className="text-xs text-gray-500 capitalize">
+                        {file.document_type?.replace('_', ' ')}
+                        {file.label && file.label !== file.file_name && ` - ${file.label}`}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </>
+      )}
+
+      {!selectedContractId && !loading && (
+        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+          <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-gray-900 mb-2">Select a Contract</h3>
+          <p className="text-gray-600">
+            Choose a contract from the dropdown above to view its analysis.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}

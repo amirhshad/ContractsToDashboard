@@ -4,6 +4,7 @@ import Login from './pages/Login'
 import Dashboard from './pages/Dashboard'
 import Upload from './pages/Upload'
 import Contracts from './pages/Contracts'
+import ContractDetail from './pages/ContractDetail'
 import Layout from './components/Layout'
 
 function App() {
@@ -27,6 +28,8 @@ function App() {
         <Route path="/" element={<Dashboard />} />
         <Route path="/upload" element={<Upload />} />
         <Route path="/contracts" element={<Contracts />} />
+        <Route path="/contracts/:id/analysis" element={<ContractDetail />} />
+        <Route path="/analysis" element={<ContractDetail />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>

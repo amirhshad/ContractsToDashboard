@@ -1,6 +1,6 @@
 import { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Upload, FileText, LogOut } from 'lucide-react'
+import { LayoutDashboard, Upload, FileText, LogOut, Search } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 
 interface LayoutProps {
@@ -15,6 +15,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/upload', icon: Upload, label: 'Upload' },
     { path: '/contracts', icon: FileText, label: 'Contracts' },
+    { path: '/analysis', icon: Search, label: 'Analysis' },
   ]
 
   return (
@@ -33,7 +34,7 @@ export default function Layout({ children }: LayoutProps) {
                     key={path}
                     to={path}
                     className={`flex items-center space-x-2 px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                      location.pathname === path
+                      location.pathname === path || (path === '/analysis' && location.pathname.includes('/analysis'))
                         ? 'bg-primary-100 text-primary-700'
                         : 'text-gray-600 hover:bg-gray-100'
                     }`}
@@ -66,7 +67,7 @@ export default function Layout({ children }: LayoutProps) {
               key={path}
               to={path}
               className={`flex flex-col items-center px-3 py-2 text-xs ${
-                location.pathname === path
+                location.pathname === path || (path === '/analysis' && location.pathname.includes('/analysis'))
                   ? 'text-primary-600'
                   : 'text-gray-600'
               }`}

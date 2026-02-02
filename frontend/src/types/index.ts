@@ -46,6 +46,22 @@ export interface UploadFile {
   label: string
 }
 
+// Party in a contract
+export interface ContractParty {
+  name: string
+  role: string
+}
+
+// Risk severity levels
+export type RiskSeverity = 'high' | 'medium' | 'low'
+
+// Risk identified in contract
+export interface ContractRisk {
+  title: string
+  description: string
+  severity: RiskSeverity
+}
+
 export interface Contract {
   id: string
   user_id: string
@@ -60,6 +76,8 @@ export interface Contract {
   auto_renewal: boolean
   cancellation_notice_days: number | null
   key_terms: string[]
+  parties: ContractParty[]
+  risks: ContractRisk[]
   file_path: string | null
   file_name: string | null
   extraction_confidence: number | null
@@ -98,6 +116,8 @@ export interface ExtractionResult {
   auto_renewal: boolean | null
   cancellation_notice_days: number | null
   key_terms: string[]
+  parties: ContractParty[]
+  risks: ContractRisk[]
   confidence: number
   // Multi-document support
   file_names?: string[]
