@@ -4,8 +4,12 @@ from http.server import BaseHTTPRequestHandler
 import json
 import os
 import re
+import sys
 from urllib.parse import urlparse, parse_qs
 import base64
+
+# Add api directory to path for extraction module imports
+sys.path.insert(0, os.path.dirname(__file__))
 
 # Import extraction module
 from extraction.prompts import UNIFIED_EXTRACTION_PROMPT
