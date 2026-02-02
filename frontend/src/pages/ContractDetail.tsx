@@ -118,17 +118,14 @@ export default function ContractDetail() {
         >
           <option value="">Choose a contract...</option>
           {contracts.map((c) => {
-            // Build a descriptive label with distinguishing info
-            const parts = [c.provider_name]
+            // Build a descriptive label with nickname as primary identifier
+            const displayName = c.contract_nickname || c.provider_name
+            const parts = [displayName]
+            if (c.contract_nickname) {
+              // If we have nickname, show provider as context
+              parts.push(c.provider_name)
+            }
             if (c.contract_type) parts.push(c.contract_type)
-            if (c.file_name) {
-              // Show shortened filename
-              const shortName = c.file_name.replace('.pdf', '').slice(0, 30)
-              parts.push(`"${shortName}"`)
-            }
-            if (c.end_date) {
-              parts.push(`expires ${new Date(c.end_date).toLocaleDateString()}`)
-            }
             if (c.monthly_cost) {
               parts.push(`$${c.monthly_cost}/mo`)
             }
@@ -159,7 +156,14 @@ export default function ContractDetail() {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
             <div className="flex items-center gap-3 mb-4">
               <Building className="w-6 h-6 text-primary-600" />
-              <h2 className="text-xl font-semibold text-gray-900">{contract.provider_name}</h2>
+              <div>
+                <h2 className="text-xl font-semibold text-gray-900">
+                  {contract.contract_nickname || contract.provider_name}
+                </h2>
+                {contract.contract_nickname && (
+                  <p className="text-sm text-gray-500">{contract.provider_name}</p>
+                )}
+              </div>
               <span className="px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800 capitalize">
                 {contract.contract_type || 'Unknown'}
               </span>

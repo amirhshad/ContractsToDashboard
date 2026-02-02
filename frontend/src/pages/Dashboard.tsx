@@ -221,9 +221,11 @@ export default function Dashboard() {
             {contracts.slice(0, 5).map((contract) => (
               <div key={contract.id} className="py-3 flex items-center justify-between">
                 <div>
-                  <p className="font-medium text-gray-900">{contract.provider_name}</p>
+                  <p className="font-medium text-gray-900">
+                    {contract.contract_nickname || contract.provider_name}
+                  </p>
                   <p className="text-sm text-gray-500">
-                    {contract.contract_type || 'Unknown type'}
+                    {contract.contract_nickname ? contract.provider_name : contract.contract_type || 'Unknown type'}
                     {contract.monthly_cost && ` • $${contract.monthly_cost}/mo`}
                   </p>
                 </div>

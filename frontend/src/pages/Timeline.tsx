@@ -13,6 +13,7 @@ interface TimelineEvent {
   id: string
   contractId: string
   provider: string
+  nickname: string | null
   type: 'end_date' | 'cancellation_deadline' | 'renewal'
   date: Date
   label: string
@@ -32,6 +33,7 @@ export default function Timeline() {
     const bars: {
       id: string
       provider: string
+      nickname: string | null
       type: string | null
       startDate: Date | null
       endDate: Date | null
@@ -46,6 +48,7 @@ export default function Timeline() {
       bars.push({
         id: contract.id,
         provider: contract.provider_name,
+        nickname: contract.contract_nickname,
         type: contract.contract_type,
         startDate,
         endDate,
@@ -61,6 +64,7 @@ export default function Timeline() {
           id: `${contract.id}-end`,
           contractId: contract.id,
           provider: contract.provider_name,
+          nickname: contract.contract_nickname,
           type: 'end_date',
           date: endDate,
           label: contract.auto_renewal ? 'Auto-renews' : 'Expires',
@@ -79,6 +83,7 @@ export default function Timeline() {
             id: `${contract.id}-cancel`,
             contractId: contract.id,
             provider: contract.provider_name,
+            nickname: contract.contract_nickname,
             type: 'cancellation_deadline',
             date: cancellationDeadline,
             label: `Cancel by (${contract.cancellation_notice_days} days notice)`,
@@ -214,7 +219,7 @@ export default function Timeline() {
                   <div className="flex items-center gap-3">
                     <Icon className="w-4 h-4 text-red-600" />
                     <div>
-                      <p className="font-medium text-gray-900">{event.provider}</p>
+                      <p className="font-medium text-gray-900">{event.nickname || event.provider}</p>
                       <p className="text-sm text-red-600">{event.label}</p>
                     </div>
                   </div>
@@ -282,7 +287,7 @@ export default function Timeline() {
                 >
                   {/* Provider label */}
                   <div className="w-48 pr-4 truncate text-sm font-medium text-gray-700 group-hover:text-primary-600">
-                    {bar.provider}
+                    {bar.nickname || bar.provider}
                   </div>
 
                   {/* Bar container */}
@@ -353,7 +358,7 @@ export default function Timeline() {
                   <div className="flex items-center gap-3">
                     <Icon className="w-5 h-5" />
                     <div>
-                      <p className="font-medium">{event.provider}</p>
+                      <p className="font-medium">{event.nickname || event.provider}</p>
                       <p className="text-sm opacity-80">{event.label}</p>
                     </div>
                   </div>
