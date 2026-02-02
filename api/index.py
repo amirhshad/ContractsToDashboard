@@ -427,7 +427,7 @@ class handler(BaseHTTPRequestHandler):
                 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
                 response = client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-opus-4-5-20251101",
                     max_tokens=2048,
                     messages=[{
                         "role": "user",
@@ -647,7 +647,7 @@ Provide 3-7 specific, actionable recommendations. Return ONLY valid JSON."""
 
                 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
                 response = client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-opus-4-5-20251101",
                     max_tokens=2048,
                     messages=[{"role": "user", "content": prompt}]
                 )
