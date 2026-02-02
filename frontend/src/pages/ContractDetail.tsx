@@ -117,24 +117,11 @@ export default function ContractDetail() {
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
         >
           <option value="">Choose a contract...</option>
-          {contracts.map((c) => {
-            // Build a descriptive label with nickname as primary identifier
-            const displayName = c.contract_nickname || c.provider_name
-            const parts = [displayName]
-            if (c.contract_nickname) {
-              // If we have nickname, show provider as context
-              parts.push(c.provider_name)
-            }
-            if (c.contract_type) parts.push(c.contract_type)
-            if (c.monthly_cost) {
-              parts.push(`$${c.monthly_cost}/mo`)
-            }
-            return (
-              <option key={c.id} value={c.id}>
-                {parts.join(' - ')}
-              </option>
-            )
-          })}
+          {contracts.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.contract_nickname || c.provider_name}
+            </option>
+          ))}
         </select>
       </div>
 
