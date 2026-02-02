@@ -135,6 +135,8 @@ REQUIRED OUTPUT FORMAT:
         }
     ],
     "confidence": 0.0-1.0,
+    "complexity": "low | medium | high",
+    "complexity_reasons": ["List reasons if complexity is high"],
     "documents_analyzed": [
         {
             "filename": "original filename",
@@ -143,6 +145,12 @@ REQUIRED OUTPUT FORMAT:
         }
     ]
 }
+
+COMPLEXITY ASSESSMENT:
+- low: Simple, single-purpose contracts (subscriptions, basic services, utilities)
+- medium: Standard business contracts with some negotiated terms
+- high: Complex legal documents with multiple parties, extensive obligations, unusual clauses,
+        cross-references between documents, or ambiguous/contradictory terms
 
 RISK CATEGORIES TO CHECK:
 - Auto-renewal with short/no cancellation window
@@ -210,6 +218,8 @@ def parse_extraction_result(raw_data: dict) -> dict:
         "parties": raw_data.get("parties", []),
         "risks": raw_data.get("risks", []),
         "confidence": 0.0,
+        "complexity": raw_data.get("complexity", "medium"),
+        "complexity_reasons": raw_data.get("complexity_reasons", []),
         "documents_analyzed": raw_data.get("documents_analyzed", []),
     }
 
@@ -242,7 +252,28 @@ def parse_extraction_result(raw_data: dict) -> dict:
         if "severity" in risk:
             risk["severity"] = risk["severity"].lower() if isinstance(risk["severity"], str) else "medium"
 
+    # Normalize complexity
+    complexity = result.get("complexity", "medium")
+    if isinstance(complexity, str):
+        result["complexity"] = complexity.lower()
+    else:
+        result["complexity"] = "medium"
+
     return result
+
+
+def needs_escalation(extraction: dict) -> bool:
+    """Check if extraction needs escalation to a more powerful model."""
+    confidence = extraction.get("confidence", 0.0)
+    complexity = extraction.get("complexity", "medium")
+
+    # Escalate if low confidence (< 0.7) or high complexity
+    if confidence < 0.7:
+        return True
+    if complexity == "high":
+        return True
+
+    return False
 
 
 def strip_json_markdown(text):
@@ -257,14 +288,15 @@ def strip_json_markdown(text):
     return text.strip()
 
 
-def extract_with_gemini(files, files_metadata):
-    """Extract contract data using Google Gemini 2.5 Flash."""
+def extract_with_gemini(files, files_metadata, model_name="gemini-3-flash-preview"):
+    """Extract contract data using Google Gemini."""
     import google.generativeai as genai
 
     genai.configure(api_key=GEMINI_API_KEY)
 
-    # Use Gemini 2.5 Flash for best cost/performance
-    model = genai.GenerativeModel("gemini-2.5-flash-preview-05-20")
+    # Default: Gemini 3 Flash (fast, cost-effective)
+    # Fallback options: gemini-2.5-pro, gemini-1.5-pro
+    model = genai.GenerativeModel(model_name)
 
     # Build content parts for Gemini
     parts = []
@@ -356,7 +388,7 @@ def generate_recommendations_with_gemini(contracts_summary):
     import google.generativeai as genai
 
     genai.configure(api_key=GEMINI_API_KEY)
-    model = genai.GenerativeModel("gemini-2.5-flash-preview-05-20")
+    model = genai.GenerativeModel("gemini-3-flash-preview")
 
     prompt = f"""Analyze these contracts and provide actionable recommendations.
 
@@ -475,19 +507,31 @@ class handler(BaseHTTPRequestHandler):
 
         # Health endpoints
         if path in ["/api/", "/api/health"]:
-            # Determine active AI provider
-            active_provider = "none"
+            # Determine AI routing configuration
+            routing_config = {
+                "primary": "none",
+                "escalation": "none",
+                "smart_routing": False
+            }
+
             if AI_PROVIDER == "claude" and ANTHROPIC_API_KEY:
-                active_provider = "claude-sonnet-4"
+                routing_config["primary"] = "claude-sonnet-4"
+                routing_config["smart_routing"] = False
             elif GEMINI_API_KEY:
-                active_provider = "gemini-2.5-flash"
+                routing_config["primary"] = "gemini-3-flash"
+                routing_config["smart_routing"] = True
+                if ANTHROPIC_API_KEY:
+                    routing_config["escalation"] = "claude-sonnet-4"
+                else:
+                    routing_config["escalation"] = "gemini-2.5-pro"
             elif ANTHROPIC_API_KEY:
-                active_provider = "claude-sonnet-4 (fallback)"
+                routing_config["primary"] = "claude-sonnet-4 (fallback)"
+                routing_config["smart_routing"] = False
 
             return self.send_json({
                 "status": "healthy",
                 "service": "Clausemate API",
-                "ai_provider": active_provider
+                "ai_routing": routing_config
             })
 
         # Auth required endpoints
@@ -611,11 +655,32 @@ class handler(BaseHTTPRequestHandler):
                 if len(files) > MAX_FILES_PER_CONTRACT:
                     return self.send_error_json(f"Maximum {MAX_FILES_PER_CONTRACT} files allowed per contract", 400)
 
-                # Use configured AI provider (gemini or claude)
+                # Smart routing: Start with Gemini 3 Flash, escalate if needed
+                escalated = False
+                escalation_model = None
+
                 if AI_PROVIDER == "claude" and ANTHROPIC_API_KEY:
+                    # If explicitly set to Claude, use Claude directly
                     raw_data = extract_with_claude(files, files_metadata)
                 elif GEMINI_API_KEY:
-                    raw_data = extract_with_gemini(files, files_metadata)
+                    # Default: Gemini 3 Flash (fast, cost-effective)
+                    raw_data = extract_with_gemini(files, files_metadata, "gemini-3-flash-preview")
+
+                    # Parse initial result to check for escalation
+                    initial_extraction = parse_extraction_result(raw_data)
+
+                    # Smart routing: escalate if low confidence or high complexity
+                    if needs_escalation(initial_extraction):
+                        # Try Claude Sonnet 4 first (highest quality), fallback to Gemini Pro
+                        if ANTHROPIC_API_KEY:
+                            raw_data = extract_with_claude(files, files_metadata)
+                            escalated = True
+                            escalation_model = "claude-sonnet-4"
+                        else:
+                            # Fallback to Gemini 2.5 Pro for complex contracts
+                            raw_data = extract_with_gemini(files, files_metadata, "gemini-2.5-pro-preview-05-06")
+                            escalated = True
+                            escalation_model = "gemini-2.5-pro"
                 elif ANTHROPIC_API_KEY:
                     # Fallback to Claude if Gemini key not available
                     raw_data = extract_with_claude(files, files_metadata)
@@ -625,8 +690,11 @@ class handler(BaseHTTPRequestHandler):
                 # Parse and normalize the extraction result
                 extraction = parse_extraction_result(raw_data)
 
-                # Add file names
+                # Add file names and routing info
                 extraction["file_names"] = [f["filename"] for f in files]
+                extraction["escalated"] = escalated
+                if escalation_model:
+                    extraction["escalation_model"] = escalation_model
 
                 return self.send_json(extraction)
 

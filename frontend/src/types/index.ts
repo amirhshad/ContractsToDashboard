@@ -106,6 +106,9 @@ export interface DocumentAnalyzed {
   summary: string
 }
 
+// Complexity level for smart routing
+export type ComplexityLevel = 'low' | 'medium' | 'high'
+
 export interface ExtractionResult {
   provider_name: string | null
   contract_nickname: string | null
@@ -122,9 +125,15 @@ export interface ExtractionResult {
   parties: ContractParty[]
   risks: ContractRisk[]
   confidence: number
+  // Complexity assessment for smart routing
+  complexity?: ComplexityLevel
+  complexity_reasons?: string[]
   // Multi-document support
   file_names?: string[]
   documents_analyzed?: DocumentAnalyzed[]
+  // Smart routing info
+  escalated?: boolean
+  escalation_model?: string
 }
 
 export type RecommendationType =
