@@ -6,11 +6,17 @@ import os
 import re
 from urllib.parse import urlparse, parse_qs
 import base64
+import io
 
 # Supabase setup
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
 SUPABASE_SERVICE_KEY = os.environ.get("SUPABASE_SERVICE_KEY", "")
+
+# AI Provider configuration
+# Options: "gemini" (default, cost-effective) or "claude" (higher quality)
+AI_PROVIDER = os.environ.get("AI_PROVIDER", "gemini").lower()
+GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 
 # Constants
@@ -239,6 +245,206 @@ def parse_extraction_result(raw_data: dict) -> dict:
     return result
 
 
+def strip_json_markdown(text):
+    """Remove markdown code blocks from JSON response."""
+    text = text.strip()
+    if text.startswith("```json"):
+        text = text[7:]
+    if text.startswith("```"):
+        text = text[3:]
+    if text.endswith("```"):
+        text = text[:-3]
+    return text.strip()
+
+
+def extract_with_gemini(files, files_metadata):
+    """Extract contract data using Google Gemini 2.5 Flash."""
+    import google.generativeai as genai
+
+    genai.configure(api_key=GEMINI_API_KEY)
+
+    # Use Gemini 2.5 Flash for best cost/performance
+    model = genai.GenerativeModel("gemini-2.5-flash-preview-05-20")
+
+    # Build content parts for Gemini
+    parts = []
+
+    for i, file_data in enumerate(files):
+        # Get document type from metadata
+        doc_type = "unknown"
+        if files_metadata and i < len(files_metadata):
+            doc_type = files_metadata[i].get("document_type", "other")
+
+        # Add document context
+        parts.append(f"Document {i+1}: {file_data['filename']} (Type: {doc_type})")
+
+        # Add PDF as inline data - Gemini supports native PDF
+        parts.append({
+            "mime_type": "application/pdf",
+            "data": file_data["content"]
+        })
+
+    # Add extraction prompt
+    parts.append(UNIFIED_EXTRACTION_PROMPT)
+
+    # Generate response
+    response = model.generate_content(
+        parts,
+        generation_config={
+            "temperature": 0.1,
+            "max_output_tokens": 4096,
+            "response_mime_type": "application/json"
+        }
+    )
+
+    result_text = strip_json_markdown(response.text)
+    return json.loads(result_text)
+
+
+def extract_with_claude(files, files_metadata):
+    """Extract contract data using Anthropic Claude Sonnet 4."""
+    import anthropic
+
+    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+
+    # Build content array for Claude
+    content = []
+
+    for i, file_data in enumerate(files):
+        base64_content = base64.standard_b64encode(file_data["content"]).decode("utf-8")
+
+        # Add document
+        content.append({
+            "type": "document",
+            "source": {
+                "type": "base64",
+                "media_type": "application/pdf",
+                "data": base64_content
+            }
+        })
+
+        # Add context about the document
+        doc_type = "unknown"
+        if files_metadata and i < len(files_metadata):
+            doc_type = files_metadata[i].get("document_type", "other")
+        content.append({
+            "type": "text",
+            "text": f"Document {i+1}: {file_data['filename']} (Type: {doc_type})"
+        })
+
+    # Add extraction prompt
+    content.append({
+        "type": "text",
+        "text": UNIFIED_EXTRACTION_PROMPT
+    })
+
+    response = client.messages.create(
+        model="claude-sonnet-4-20250514",
+        max_tokens=4096,
+        messages=[{
+            "role": "user",
+            "content": content
+        }]
+    )
+
+    result_text = strip_json_markdown(response.content[0].text)
+    return json.loads(result_text)
+
+
+def generate_recommendations_with_gemini(contracts_summary):
+    """Generate recommendations using Gemini."""
+    import google.generativeai as genai
+
+    genai.configure(api_key=GEMINI_API_KEY)
+    model = genai.GenerativeModel("gemini-2.5-flash-preview-05-20")
+
+    prompt = f"""Analyze these contracts and provide actionable recommendations.
+
+CONTRACTS:
+{json.dumps(contracts_summary, indent=2)}
+
+Generate recommendations in this JSON format. Each recommendation should reference a specific contract_id when applicable, or be null for portfolio-wide recommendations:
+
+{{
+    "recommendations": [
+        {{
+            "contract_id": "uuid or null for portfolio-wide",
+            "type": "cost_reduction | consolidation | risk_alert | renewal_reminder",
+            "title": "Short actionable title",
+            "description": "Detailed explanation and action steps",
+            "estimated_savings": number or null,
+            "priority": "high | medium | low",
+            "reasoning": "Why this recommendation matters"
+        }}
+    ]
+}}
+
+Focus on:
+1. Cost reduction opportunities (negotiate, switch providers, remove unused services)
+2. Consolidation (combine similar contracts for better rates)
+3. Risk alerts (auto-renewals, unfavorable terms, missing cancellation windows)
+4. Renewal reminders (contracts expiring soon that need attention)
+
+Provide 3-7 specific, actionable recommendations. Return ONLY valid JSON."""
+
+    response = model.generate_content(
+        prompt,
+        generation_config={
+            "temperature": 0.2,
+            "max_output_tokens": 4096,
+            "response_mime_type": "application/json"
+        }
+    )
+
+    result_text = strip_json_markdown(response.text)
+    return json.loads(result_text)
+
+
+def generate_recommendations_with_claude(contracts_summary):
+    """Generate recommendations using Claude."""
+    import anthropic
+
+    client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+
+    prompt = f"""Analyze these contracts and provide actionable recommendations.
+
+CONTRACTS:
+{json.dumps(contracts_summary, indent=2)}
+
+Generate recommendations in this JSON format. Each recommendation should reference a specific contract_id when applicable, or be null for portfolio-wide recommendations:
+
+{{
+    "recommendations": [
+        {{
+            "contract_id": "uuid or null for portfolio-wide",
+            "type": "cost_reduction | consolidation | risk_alert | renewal_reminder",
+            "title": "Short actionable title",
+            "description": "Detailed explanation and action steps",
+            "estimated_savings": number or null,
+            "priority": "high | medium | low",
+            "reasoning": "Why this recommendation matters"
+        }}
+    ]
+}}
+
+Focus on:
+1. Cost reduction opportunities (negotiate, switch providers, remove unused services)
+2. Consolidation (combine similar contracts for better rates)
+3. Risk alerts (auto-renewals, unfavorable terms, missing cancellation windows)
+4. Renewal reminders (contracts expiring soon that need attention)
+
+Provide 3-7 specific, actionable recommendations. Return ONLY valid JSON."""
+
+    response = client.messages.create(
+        model="claude-sonnet-4-20250514",
+        max_tokens=4096,
+        messages=[{"role": "user", "content": prompt}]
+    )
+
+    result_text = strip_json_markdown(response.content[0].text)
+    return json.loads(result_text)
+
+
 class handler(BaseHTTPRequestHandler):
     def send_json(self, data, status=200):
         """Send JSON response."""
@@ -269,7 +475,20 @@ class handler(BaseHTTPRequestHandler):
 
         # Health endpoints
         if path in ["/api/", "/api/health"]:
-            return self.send_json({"status": "healthy", "service": "Clausemate API"})
+            # Determine active AI provider
+            active_provider = "none"
+            if AI_PROVIDER == "claude" and ANTHROPIC_API_KEY:
+                active_provider = "claude-sonnet-4"
+            elif GEMINI_API_KEY:
+                active_provider = "gemini-2.5-flash"
+            elif ANTHROPIC_API_KEY:
+                active_provider = "claude-sonnet-4 (fallback)"
+
+            return self.send_json({
+                "status": "healthy",
+                "service": "Clausemate API",
+                "ai_provider": active_provider
+            })
 
         # Auth required endpoints
         token = parse_authorization(dict(self.headers))
@@ -379,7 +598,6 @@ class handler(BaseHTTPRequestHandler):
         # Upload extract - supports multiple files
         if path == "/api/upload/extract":
             try:
-                import anthropic
                 content_length = int(self.headers.get("Content-Length", 0))
                 body = self.rfile.read(content_length)
                 content_type = self.headers.get("Content-Type", "")
@@ -393,60 +611,18 @@ class handler(BaseHTTPRequestHandler):
                 if len(files) > MAX_FILES_PER_CONTRACT:
                     return self.send_error_json(f"Maximum {MAX_FILES_PER_CONTRACT} files allowed per contract", 400)
 
-                # Build content array for Claude with all documents
-                content = []
+                # Use configured AI provider (gemini or claude)
+                if AI_PROVIDER == "claude" and ANTHROPIC_API_KEY:
+                    raw_data = extract_with_claude(files, files_metadata)
+                elif GEMINI_API_KEY:
+                    raw_data = extract_with_gemini(files, files_metadata)
+                elif ANTHROPIC_API_KEY:
+                    # Fallback to Claude if Gemini key not available
+                    raw_data = extract_with_claude(files, files_metadata)
+                else:
+                    return self.send_error_json("No AI provider configured. Set GEMINI_API_KEY or ANTHROPIC_API_KEY.", 500)
 
-                for i, file_data in enumerate(files):
-                    base64_content = base64.standard_b64encode(file_data["content"]).decode("utf-8")
-
-                    # Add document
-                    content.append({
-                        "type": "document",
-                        "source": {
-                            "type": "base64",
-                            "media_type": "application/pdf",
-                            "data": base64_content
-                        }
-                    })
-
-                    # Add context about the document
-                    doc_type = "unknown"
-                    if files_metadata and i < len(files_metadata):
-                        doc_type = files_metadata[i].get("document_type", "other")
-                    content.append({
-                        "type": "text",
-                        "text": f"Document {i+1}: {file_data['filename']} (Type: {doc_type})"
-                    })
-
-                # Add extraction prompt
-                content.append({
-                    "type": "text",
-                    "text": UNIFIED_EXTRACTION_PROMPT
-                })
-
-                client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-
-                response = client.messages.create(
-                    model="claude-opus-4-5-20251101",
-                    max_tokens=2048,
-                    messages=[{
-                        "role": "user",
-                        "content": content
-                    }]
-                )
-
-                result_text = response.content[0].text
-
-                # Strip markdown code blocks if present
-                if result_text.startswith("```json"):
-                    result_text = result_text[7:]
-                if result_text.startswith("```"):
-                    result_text = result_text[3:]
-                if result_text.endswith("```"):
-                    result_text = result_text[:-3]
-
-                # Parse JSON and normalize
-                raw_data = json.loads(result_text.strip())
+                # Parse and normalize the extraction result
                 extraction = parse_extraction_result(raw_data)
 
                 # Add file names
@@ -591,15 +767,13 @@ class handler(BaseHTTPRequestHandler):
         # Generate recommendations using AI
         if path == "/api/recommendations/generate":
             try:
-                import anthropic
-
                 # Fetch all user's contracts
                 contracts = supabase.table("contracts").select("*").eq("user_id", user_id).execute()
 
                 if not contracts.data:
                     return self.send_json([])
 
-                # Build context for Claude
+                # Build context for AI
                 contracts_summary = []
                 for c in contracts.data:
                     contracts_summary.append({
@@ -616,51 +790,17 @@ class handler(BaseHTTPRequestHandler):
                         "risks": c.get("risks", []),
                     })
 
-                prompt = f"""Analyze these contracts and provide actionable recommendations.
+                # Use configured AI provider
+                if AI_PROVIDER == "claude" and ANTHROPIC_API_KEY:
+                    ai_result = generate_recommendations_with_claude(contracts_summary)
+                elif GEMINI_API_KEY:
+                    ai_result = generate_recommendations_with_gemini(contracts_summary)
+                elif ANTHROPIC_API_KEY:
+                    # Fallback to Claude if Gemini key not available
+                    ai_result = generate_recommendations_with_claude(contracts_summary)
+                else:
+                    return self.send_error_json("No AI provider configured. Set GEMINI_API_KEY or ANTHROPIC_API_KEY.", 500)
 
-CONTRACTS:
-{json.dumps(contracts_summary, indent=2)}
-
-Generate recommendations in this JSON format. Each recommendation should reference a specific contract_id when applicable, or be null for portfolio-wide recommendations:
-
-{{
-    "recommendations": [
-        {{
-            "contract_id": "uuid or null for portfolio-wide",
-            "type": "cost_reduction | consolidation | risk_alert | renewal_reminder",
-            "title": "Short actionable title",
-            "description": "Detailed explanation and action steps",
-            "estimated_savings": number or null,
-            "priority": "high | medium | low",
-            "reasoning": "Why this recommendation matters"
-        }}
-    ]
-}}
-
-Focus on:
-1. Cost reduction opportunities (negotiate, switch providers, remove unused services)
-2. Consolidation (combine similar contracts for better rates)
-3. Risk alerts (auto-renewals, unfavorable terms, missing cancellation windows)
-4. Renewal reminders (contracts expiring soon that need attention)
-
-Provide 3-7 specific, actionable recommendations. Return ONLY valid JSON."""
-
-                client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
-                response = client.messages.create(
-                    model="claude-opus-4-5-20251101",
-                    max_tokens=2048,
-                    messages=[{"role": "user", "content": prompt}]
-                )
-
-                result_text = response.content[0].text
-                if result_text.startswith("```json"):
-                    result_text = result_text[7:]
-                if result_text.startswith("```"):
-                    result_text = result_text[3:]
-                if result_text.endswith("```"):
-                    result_text = result_text[:-3]
-
-                ai_result = json.loads(result_text.strip())
                 recommendations = ai_result.get("recommendations", [])
 
                 # Clear old pending recommendations for this user
