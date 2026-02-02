@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { FileText, Trash2, Search, Filter } from 'lucide-react'
 import { useContracts } from '../hooks/useContracts'
+import { getCurrencySymbol } from '../types'
 
 export default function Contracts() {
   const { contracts, loading, error, deleteContract } = useContracts()
@@ -9,9 +10,10 @@ export default function Contracts() {
   const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const filteredContracts = contracts.filter((contract) => {
-    const matchesSearch = contract.provider_name
-      .toLowerCase()
-      .includes(search.toLowerCase())
+    const searchLower = search.toLowerCase()
+    const matchesSearch =
+      contract.provider_name.toLowerCase().includes(searchLower) ||
+      (contract.contract_nickname?.toLowerCase().includes(searchLower) ?? false)
     const matchesType = !typeFilter || contract.contract_type === typeFilter
     return matchesSearch && matchesType
   })
@@ -31,9 +33,9 @@ export default function Contracts() {
     return new Date(date).toLocaleDateString()
   }
 
-  const formatCurrency = (amount: number | null) => {
+  const formatCurrency = (amount: number | null, currency: string = 'USD') => {
     if (amount === null) return '-'
-    return `$${amount.toLocaleString()}`
+    return `${getCurrencySymbol(currency)}${amount.toLocaleString()}`
   }
 
   if (loading) {
@@ -112,7 +114,7 @@ export default function Contracts() {
             <thead className="bg-gray-50">
               <tr>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Provider
+                  Contract
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Type
@@ -139,12 +141,14 @@ export default function Contracts() {
                       <FileText className="w-5 h-5 text-gray-400 mr-3" />
                       <div>
                         <div className="font-medium text-gray-900">
-                          {contract.provider_name}
+                          {contract.contract_nickname || contract.provider_name}
                         </div>
                         <div className="text-sm text-gray-500">
-                          {contract.file_count && contract.file_count > 1
-                            ? `${contract.file_count} documents`
-                            : contract.file_name || '1 document'}
+                          {contract.contract_nickname
+                            ? contract.provider_name
+                            : contract.file_count && contract.file_count > 1
+                              ? `${contract.file_count} documents`
+                              : contract.file_name || '1 document'}
                         </div>
                       </div>
                     </div>
@@ -155,7 +159,7 @@ export default function Contracts() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-gray-900">
-                    {formatCurrency(contract.monthly_cost)}
+                    {formatCurrency(contract.monthly_cost, contract.currency)}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-gray-500">
                     {formatDate(contract.end_date)}
