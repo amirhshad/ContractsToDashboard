@@ -141,9 +141,11 @@ export default function Contracts() {
                         <div className="font-medium text-gray-900">
                           {contract.provider_name}
                         </div>
-                        {contract.file_name && (
-                          <div className="text-sm text-gray-500">{contract.file_name}</div>
-                        )}
+                        <div className="text-sm text-gray-500">
+                          {contract.file_count && contract.file_count > 1
+                            ? `${contract.file_count} documents`
+                            : contract.file_name || '1 document'}
+                        </div>
                       </div>
                     </div>
                   </td>

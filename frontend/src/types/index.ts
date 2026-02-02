@@ -14,6 +14,38 @@ export type PaymentFrequency =
   | 'one-time'
   | 'other'
 
+// Document types for multi-document contracts
+export type DocumentType =
+  | 'main_agreement'
+  | 'sow'
+  | 'terms_conditions'
+  | 'amendment'
+  | 'addendum'
+  | 'exhibit'
+  | 'schedule'
+  | 'other'
+
+// Contract file record (from contract_files table)
+export interface ContractFile {
+  id: string
+  contract_id: string
+  file_path: string
+  file_name: string
+  file_size_bytes: number | null
+  mime_type: string
+  document_type: DocumentType
+  label: string | null
+  display_order: number
+  created_at: string
+}
+
+// File for upload (before saving)
+export interface UploadFile {
+  file: File
+  document_type: DocumentType
+  label: string
+}
+
 export interface Contract {
   id: string
   user_id: string
@@ -34,6 +66,9 @@ export interface Contract {
   user_verified: boolean
   created_at: string
   updated_at: string
+  // Multi-document support
+  files?: ContractFile[]
+  file_count?: number
 }
 
 export interface ContractSummary {
@@ -43,6 +78,13 @@ export interface ContractSummary {
   contracts_by_type: Record<string, number>
   expiring_soon: number
   auto_renewal_count: number
+}
+
+// Document analyzed by Claude
+export interface DocumentAnalyzed {
+  filename: string
+  document_type: string
+  summary: string
 }
 
 export interface ExtractionResult {
@@ -57,6 +99,9 @@ export interface ExtractionResult {
   cancellation_notice_days: number | null
   key_terms: string[]
   confidence: number
+  // Multi-document support
+  file_names?: string[]
+  documents_analyzed?: DocumentAnalyzed[]
 }
 
 export type RecommendationType =
@@ -84,3 +129,15 @@ export interface Recommendation {
   created_at: string
   acted_on_at: string | null
 }
+
+// Document type options for UI
+export const DOCUMENT_TYPE_OPTIONS: { value: DocumentType; label: string }[] = [
+  { value: 'main_agreement', label: 'Main Agreement' },
+  { value: 'sow', label: 'Statement of Work (SOW)' },
+  { value: 'terms_conditions', label: 'Terms & Conditions' },
+  { value: 'amendment', label: 'Amendment' },
+  { value: 'addendum', label: 'Addendum' },
+  { value: 'exhibit', label: 'Exhibit' },
+  { value: 'schedule', label: 'Schedule' },
+  { value: 'other', label: 'Other' },
+]

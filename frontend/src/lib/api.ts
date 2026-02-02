@@ -1,5 +1,5 @@
 import { supabase } from './supabase'
-import type { Contract, ContractSummary, ExtractionResult, Recommendation } from '../types'
+import type { Contract, ContractSummary, ContractFile, ExtractionResult, Recommendation, UploadFile } from '../types'
 
 const API_URL = import.meta.env.VITE_API_URL || ''
 
@@ -25,6 +25,13 @@ export async function getContract(id: string): Promise<Contract> {
   const headers = await getAuthHeader()
   const res = await fetch(`${API_URL}/api/contracts/${id}`, { headers })
   if (!res.ok) throw new Error('Failed to fetch contract')
+  return res.json()
+}
+
+export async function getContractFiles(contractId: string): Promise<ContractFile[]> {
+  const headers = await getAuthHeader()
+  const res = await fetch(`${API_URL}/api/contracts/${contractId}/files`, { headers })
+  if (!res.ok) throw new Error('Failed to fetch contract files')
   return res.json()
 }
 
@@ -55,11 +62,24 @@ export async function deleteContract(id: string): Promise<void> {
   if (!res.ok) throw new Error('Failed to delete contract')
 }
 
-// Upload API
-export async function extractContract(file: File): Promise<ExtractionResult> {
+// Upload API - Multi-file support
+export async function extractContracts(files: UploadFile[]): Promise<ExtractionResult> {
   const headers = await getAuthHeader()
   const formData = new FormData()
-  formData.append('file', file)
+
+  // Add all files
+  files.forEach((uploadFile, index) => {
+    formData.append(`file_${index}`, uploadFile.file)
+  })
+
+  // Add metadata as JSON
+  formData.append('files_metadata', JSON.stringify(
+    files.map(f => ({
+      filename: f.file.name,
+      document_type: f.document_type,
+      label: f.label
+    }))
+  ))
 
   const res = await fetch(`${API_URL}/api/upload/extract`, {
     method: 'POST',
@@ -70,13 +90,31 @@ export async function extractContract(file: File): Promise<ExtractionResult> {
   return res.json()
 }
 
-export async function confirmContract(
-  file: File,
+// Backward compatible single file extract
+export async function extractContract(file: File): Promise<ExtractionResult> {
+  return extractContracts([{ file, document_type: 'main_agreement', label: file.name }])
+}
+
+export async function confirmContracts(
+  files: UploadFile[],
   data: Partial<ExtractionResult>
 ): Promise<Contract> {
   const headers = await getAuthHeader()
   const formData = new FormData()
-  formData.append('file', file)
+
+  // Add all files
+  files.forEach((uploadFile, index) => {
+    formData.append(`file_${index}`, uploadFile.file)
+  })
+
+  // Add metadata as JSON
+  formData.append('files_metadata', JSON.stringify(
+    files.map(f => ({
+      filename: f.file.name,
+      document_type: f.document_type,
+      label: f.label || f.file.name
+    }))
+  ))
 
   // Add extraction data as query params
   const params = new URLSearchParams()
@@ -88,6 +126,7 @@ export async function confirmContract(
   if (data.end_date) params.append('end_date', data.end_date)
   if (data.auto_renewal !== undefined) params.append('auto_renewal', String(data.auto_renewal))
   if (data.cancellation_notice_days) params.append('cancellation_notice_days', String(data.cancellation_notice_days))
+  if (data.key_terms && data.key_terms.length > 0) params.append('key_terms', JSON.stringify(data.key_terms))
 
   const res = await fetch(`${API_URL}/api/upload/confirm?${params}`, {
     method: 'POST',
@@ -96,6 +135,14 @@ export async function confirmContract(
   })
   if (!res.ok) throw new Error('Failed to save contract')
   return res.json()
+}
+
+// Backward compatible single file confirm
+export async function confirmContract(
+  file: File,
+  data: Partial<ExtractionResult>
+): Promise<Contract> {
+  return confirmContracts([{ file, document_type: 'main_agreement', label: file.name }], data)
 }
 
 // Recommendations API
