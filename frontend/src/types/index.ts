@@ -110,6 +110,7 @@ export interface ExtractionResult {
   contract_type: string | null
   monthly_cost: number | null
   annual_cost: number | null
+  currency: string
   payment_frequency: string | null
   start_date: string | null
   end_date: string | null
@@ -161,3 +162,19 @@ export const DOCUMENT_TYPE_OPTIONS: { value: DocumentType; label: string }[] = [
   { value: 'schedule', label: 'Schedule' },
   { value: 'other', label: 'Other' },
 ]
+
+// Currency options for UI
+export const CURRENCY_OPTIONS: { value: string; label: string; symbol: string }[] = [
+  { value: 'USD', label: 'US Dollar', symbol: '$' },
+  { value: 'EUR', label: 'Euro', symbol: '€' },
+  { value: 'GBP', label: 'British Pound', symbol: '£' },
+  { value: 'CAD', label: 'Canadian Dollar', symbol: 'C$' },
+  { value: 'AUD', label: 'Australian Dollar', symbol: 'A$' },
+  { value: 'JPY', label: 'Japanese Yen', symbol: '¥' },
+]
+
+// Helper to get currency symbol
+export const getCurrencySymbol = (currency: string): string => {
+  const found = CURRENCY_OPTIONS.find((c) => c.value === currency)
+  return found?.symbol || '$'
+}

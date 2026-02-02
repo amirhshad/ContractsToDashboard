@@ -7,6 +7,10 @@ import re
 from urllib.parse import urlparse, parse_qs
 import base64
 
+# Import extraction module
+from extraction.prompts import UNIFIED_EXTRACTION_PROMPT
+from extraction.models import parse_extraction_result
+
 # Supabase setup
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
 SUPABASE_ANON_KEY = os.environ.get("SUPABASE_ANON_KEY", "")
@@ -89,53 +93,7 @@ def parse_multipart_files(body, content_type):
     return files, metadata
 
 
-# Multi-document extraction prompt
-MULTI_DOC_EXTRACTION_PROMPT = """You are analyzing a contract package consisting of one or more related documents.
-These documents together form a single contractual relationship (e.g., a Framework Agreement with SOWs,
-a Policy with Terms & Conditions, etc.).
-
-Analyze ALL provided documents together and extract a UNIFIED view of the contract:
-
-{
-    "provider_name": "Company/service provider name (from main agreement)",
-    "contract_type": "One of: insurance, utility, subscription, rental, saas, service, other",
-    "monthly_cost": "Total monthly cost across all documents, as a number or null",
-    "annual_cost": "Total annual cost across all documents, as a number or null",
-    "start_date": "Earliest effective start date in YYYY-MM-DD format or null",
-    "end_date": "Latest end date in YYYY-MM-DD format or null",
-    "auto_renewal": true or false (from main agreement or as overridden by amendments),
-    "cancellation_notice_days": "Number of days notice required or null",
-    "key_terms": ["List of important terms from ALL documents"],
-    "parties": [
-        {
-            "name": "Full legal name of the party",
-            "role": "Role in contract: provider, client, insurer, insured, landlord, tenant, licensor, licensee, etc."
-        }
-    ],
-    "risks": [
-        {
-            "title": "Short risk title",
-            "description": "Description of the risk or concern",
-            "severity": "high, medium, or low"
-        }
-    ],
-    "confidence": 0.0-1.0 confidence score,
-    "documents_analyzed": [
-        {
-            "filename": "original filename",
-            "document_type": "detected type: main_agreement, sow, terms_conditions, amendment, addendum, exhibit, schedule, or other",
-            "summary": "Brief 1-sentence summary of what this document covers"
-        }
-    ]
-}
-
-IMPORTANT:
-- If documents have conflicting terms, note the conflict in key_terms and use the most recent/specific version
-- Amendments and SOWs typically override terms in the main agreement
-- Combine costs if multiple SOWs/schedules specify separate fees
-- For parties: Extract ALL parties mentioned (typically 2+), identify their roles clearly
-- For risks: Identify potential risks like auto-renewal traps, unfavorable terms, liability issues, termination penalties, etc.
-- Return ONLY the JSON object, no additional text."""
+# Extraction prompt is now imported from extraction.prompts module
 
 
 class handler(BaseHTTPRequestHandler):
@@ -320,7 +278,7 @@ class handler(BaseHTTPRequestHandler):
                 # Add extraction prompt
                 content.append({
                     "type": "text",
-                    "text": MULTI_DOC_EXTRACTION_PROMPT
+                    "text": UNIFIED_EXTRACTION_PROMPT
                 })
 
                 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
@@ -335,6 +293,8 @@ class handler(BaseHTTPRequestHandler):
                 )
 
                 result_text = response.content[0].text
+
+                # Strip markdown code blocks if present
                 if result_text.startswith("```json"):
                     result_text = result_text[7:]
                 if result_text.startswith("```"):
@@ -342,9 +302,12 @@ class handler(BaseHTTPRequestHandler):
                 if result_text.endswith("```"):
                     result_text = result_text[:-3]
 
-                extraction = json.loads(result_text.strip())
+                # Parse JSON and validate with Pydantic
+                raw_data = json.loads(result_text.strip())
+                validated = parse_extraction_result(raw_data)
 
-                # Add file names to extraction result
+                # Convert to dict and add file names
+                extraction = validated.model_dump()
                 extraction["file_names"] = [f["filename"] for f in files]
 
                 return self.send_json(extraction)
@@ -406,6 +369,7 @@ class handler(BaseHTTPRequestHandler):
                     "contract_type": params.get("contract_type"),
                     "monthly_cost": float(params["monthly_cost"]) if params.get("monthly_cost") else None,
                     "annual_cost": float(params["annual_cost"]) if params.get("annual_cost") else None,
+                    "currency": params.get("currency", "USD"),
                     "start_date": params.get("start_date"),
                     "end_date": params.get("end_date"),
                     "auto_renewal": params.get("auto_renewal", "true").lower() == "true",

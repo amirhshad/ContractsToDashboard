@@ -122,6 +122,7 @@ export async function confirmContracts(
   if (data.contract_type) params.append('contract_type', data.contract_type)
   if (data.monthly_cost) params.append('monthly_cost', String(data.monthly_cost))
   if (data.annual_cost) params.append('annual_cost', String(data.annual_cost))
+  if (data.currency) params.append('currency', data.currency)
   if (data.start_date) params.append('start_date', data.start_date)
   if (data.end_date) params.append('end_date', data.end_date)
   if (data.auto_renewal !== undefined) params.append('auto_renewal', String(data.auto_renewal))

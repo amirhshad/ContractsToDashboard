@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { Check, X, AlertCircle } from 'lucide-react'
 import type { ExtractionResult } from '../types'
+import { CURRENCY_OPTIONS, getCurrencySymbol } from '../types'
 
 interface ExtractionReviewProps {
   extraction: ExtractionResult
@@ -95,6 +96,24 @@ export default function ExtractionReview({
           </select>
         </div>
 
+        {/* Currency */}
+        <div>
+          <label className="block text-sm font-medium text-gray-700 mb-1">
+            Currency
+          </label>
+          <select
+            value={data.currency || 'USD'}
+            onChange={(e) => handleChange('currency', e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+          >
+            {CURRENCY_OPTIONS.map((currency) => (
+              <option key={currency.value} value={currency.value}>
+                {currency.symbol} - {currency.label}
+              </option>
+            ))}
+          </select>
+        </div>
+
         {/* Monthly Cost */}
         <div>
           <label className="block text-sm font-medium text-gray-700 mb-1">
@@ -102,7 +121,7 @@ export default function ExtractionReview({
           </label>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-              $
+              {getCurrencySymbol(data.currency || 'USD')}
             </span>
             <input
               type="number"
@@ -112,7 +131,7 @@ export default function ExtractionReview({
               onChange={(e) =>
                 handleChange('monthly_cost', e.target.value ? parseFloat(e.target.value) : null)
               }
-              className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
         </div>
@@ -124,7 +143,7 @@ export default function ExtractionReview({
           </label>
           <div className="relative">
             <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">
-              $
+              {getCurrencySymbol(data.currency || 'USD')}
             </span>
             <input
               type="number"
@@ -134,7 +153,7 @@ export default function ExtractionReview({
               onChange={(e) =>
                 handleChange('annual_cost', e.target.value ? parseFloat(e.target.value) : null)
               }
-              className="w-full pl-7 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
+              className="w-full pl-8 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500"
             />
           </div>
         </div>
