@@ -119,6 +119,7 @@ export async function confirmContracts(
   // Add extraction data as query params
   const params = new URLSearchParams()
   if (data.provider_name) params.append('provider_name', data.provider_name)
+  if (data.contract_nickname) params.append('contract_nickname', data.contract_nickname)
   if (data.contract_type) params.append('contract_type', data.contract_type)
   if (data.monthly_cost) params.append('monthly_cost', String(data.monthly_cost))
   if (data.annual_cost) params.append('annual_cost', String(data.annual_cost))

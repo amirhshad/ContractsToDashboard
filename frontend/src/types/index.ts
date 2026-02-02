@@ -66,6 +66,7 @@ export interface Contract {
   id: string
   user_id: string
   provider_name: string
+  contract_nickname: string | null
   contract_type: ContractType | null
   monthly_cost: number | null
   annual_cost: number | null
@@ -107,6 +108,7 @@ export interface DocumentAnalyzed {
 
 export interface ExtractionResult {
   provider_name: string | null
+  contract_nickname: string | null
   contract_type: string | null
   monthly_cost: number | null
   annual_cost: number | null

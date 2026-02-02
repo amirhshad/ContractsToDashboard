@@ -104,6 +104,7 @@ IMPORTANT INSTRUCTIONS:
 REQUIRED OUTPUT FORMAT:
 {
     "provider_name": "Company/service provider name (string or null)",
+    "contract_nickname": "Short descriptive name for this specific contract (e.g., 'Car Insurance 2025', 'Office Lease', 'Netflix Subscription')",
     "contract_type": "insurance | utility | subscription | rental | saas | service | other",
     "monthly_cost": 0.00,
     "annual_cost": 0.00,
@@ -189,6 +190,7 @@ def parse_extraction_result(raw_data: dict) -> dict:
     """Parse and normalize extraction result."""
     result = {
         "provider_name": raw_data.get("provider_name"),
+        "contract_nickname": raw_data.get("contract_nickname"),
         "contract_type": raw_data.get("contract_type", "").lower() if raw_data.get("contract_type") else None,
         "monthly_cost": None,
         "annual_cost": None,
@@ -506,6 +508,7 @@ class handler(BaseHTTPRequestHandler):
                 contract_data = {
                     "user_id": user_id,
                     "provider_name": provider_name,
+                    "contract_nickname": params.get("contract_nickname"),
                     "contract_type": params.get("contract_type"),
                     "monthly_cost": float(params["monthly_cost"]) if params.get("monthly_cost") else None,
                     "annual_cost": float(params["annual_cost"]) if params.get("annual_cost") else None,
