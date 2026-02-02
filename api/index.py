@@ -4,16 +4,8 @@ from http.server import BaseHTTPRequestHandler
 import json
 import os
 import re
-import sys
 from urllib.parse import urlparse, parse_qs
 import base64
-
-# Add api directory to path for extraction module imports
-sys.path.insert(0, os.path.dirname(__file__))
-
-# Import extraction module
-from extraction.prompts import UNIFIED_EXTRACTION_PROMPT
-from extraction.models import parse_extraction_result
 
 # Supabase setup
 SUPABASE_URL = os.environ.get("SUPABASE_URL", "")
@@ -97,7 +89,152 @@ def parse_multipart_files(body, content_type):
     return files, metadata
 
 
-# Extraction prompt is now imported from extraction.prompts module
+# Unified extraction prompt
+UNIFIED_EXTRACTION_PROMPT = """You are analyzing contract documents to extract structured data.
+You may receive 1 to 5 related documents that together form a single contractual relationship.
+
+IMPORTANT INSTRUCTIONS:
+1. Analyze ALL provided documents together as one contract package
+2. Extract a UNIFIED view combining information from all documents
+3. If documents have conflicting terms, use the most recent/specific version
+4. Amendments and SOWs typically override terms in the main agreement
+5. Combine costs if multiple documents specify separate fees
+6. Return ONLY valid JSON - no markdown, no explanation, no code blocks
+
+REQUIRED OUTPUT FORMAT:
+{
+    "provider_name": "Company/service provider name (string or null)",
+    "contract_type": "insurance | utility | subscription | rental | saas | service | other",
+    "monthly_cost": 0.00,
+    "annual_cost": 0.00,
+    "currency": "USD | EUR | GBP | CAD | AUD | JPY (detect from document)",
+    "payment_frequency": "monthly | annual | quarterly | one-time | other",
+    "start_date": "YYYY-MM-DD or null",
+    "end_date": "YYYY-MM-DD or null",
+    "auto_renewal": true | false | null,
+    "cancellation_notice_days": 0,
+    "key_terms": ["Important terms from ALL documents"],
+    "parties": [
+        {
+            "name": "Full legal name of party",
+            "role": "provider | client | insurer | insured | landlord | tenant | licensor | licensee | vendor | customer"
+        }
+    ],
+    "risks": [
+        {
+            "title": "Short risk title",
+            "description": "Why this is a risk and what to watch for",
+            "severity": "high | medium | low"
+        }
+    ],
+    "confidence": 0.0-1.0,
+    "documents_analyzed": [
+        {
+            "filename": "original filename",
+            "document_type": "main_agreement | sow | terms_conditions | amendment | addendum | exhibit | schedule | other",
+            "summary": "One sentence summary"
+        }
+    ]
+}
+
+RISK CATEGORIES TO CHECK:
+- Auto-renewal with short/no cancellation window
+- Automatic price increases or escalation clauses
+- Liability limitations that favor provider
+- Data retention or privacy concerns
+- Termination penalties or early exit fees
+- Long lock-in periods without flexibility
+- Unusual indemnification requirements
+- Missing SLA or service guarantees
+- Ambiguous scope of services
+
+CONTRACT TYPE GUIDANCE:
+- insurance: Health, auto, home, liability policies
+- utility: Electric, gas, water, internet, phone
+- subscription: Streaming, magazines, memberships
+- rental: Real estate leases, equipment rental
+- saas: Software subscriptions, cloud services
+- service: Consulting, maintenance, professional services
+- other: Anything that doesn't fit above
+
+FIELD EXTRACTION RULES:
+1. provider_name: Main company providing the service (not the customer)
+2. parties: Extract ALL parties (usually 2+), identify their contractual roles
+3. costs: Convert to numbers only (no currency symbols). Detect currency separately.
+4. dates: Always use YYYY-MM-DD format
+5. confidence: 0.9+ for clear documents, 0.6-0.8 for partial info, <0.6 for unclear
+6. key_terms: Include renewal terms, limitations, important obligations, SLAs
+
+Return ONLY the JSON object. Do not include any other text."""
+
+# Currency normalization
+CURRENCY_SYMBOL_MAP = {"$": "USD", "€": "EUR", "£": "GBP", "¥": "JPY", "C$": "CAD", "A$": "AUD"}
+VALID_CURRENCIES = {"USD", "EUR", "GBP", "CAD", "AUD", "JPY"}
+
+
+def normalize_currency(v):
+    """Normalize currency symbols to codes."""
+    if v is None:
+        return "USD"
+    v = str(v).strip()
+    if v in CURRENCY_SYMBOL_MAP:
+        return CURRENCY_SYMBOL_MAP[v]
+    v_upper = v.upper()
+    if v_upper in VALID_CURRENCIES:
+        return v_upper
+    return "USD"
+
+
+def parse_extraction_result(raw_data: dict) -> dict:
+    """Parse and normalize extraction result."""
+    result = {
+        "provider_name": raw_data.get("provider_name"),
+        "contract_type": raw_data.get("contract_type", "").lower() if raw_data.get("contract_type") else None,
+        "monthly_cost": None,
+        "annual_cost": None,
+        "currency": normalize_currency(raw_data.get("currency")),
+        "payment_frequency": raw_data.get("payment_frequency", "").lower() if raw_data.get("payment_frequency") else None,
+        "start_date": raw_data.get("start_date"),
+        "end_date": raw_data.get("end_date"),
+        "auto_renewal": raw_data.get("auto_renewal"),
+        "cancellation_notice_days": None,
+        "key_terms": raw_data.get("key_terms", []),
+        "parties": raw_data.get("parties", []),
+        "risks": raw_data.get("risks", []),
+        "confidence": 0.0,
+        "documents_analyzed": raw_data.get("documents_analyzed", []),
+    }
+
+    # Parse numeric fields
+    try:
+        if raw_data.get("monthly_cost") is not None:
+            result["monthly_cost"] = float(raw_data["monthly_cost"])
+    except (ValueError, TypeError):
+        pass
+
+    try:
+        if raw_data.get("annual_cost") is not None:
+            result["annual_cost"] = float(raw_data["annual_cost"])
+    except (ValueError, TypeError):
+        pass
+
+    try:
+        if raw_data.get("cancellation_notice_days") is not None:
+            result["cancellation_notice_days"] = int(raw_data["cancellation_notice_days"])
+    except (ValueError, TypeError):
+        pass
+
+    try:
+        result["confidence"] = float(raw_data.get("confidence", 0.0))
+    except (ValueError, TypeError):
+        result["confidence"] = 0.0
+
+    # Normalize risk severities
+    for risk in result["risks"]:
+        if "severity" in risk:
+            risk["severity"] = risk["severity"].lower() if isinstance(risk["severity"], str) else "medium"
+
+    return result
 
 
 class handler(BaseHTTPRequestHandler):
@@ -306,12 +443,11 @@ class handler(BaseHTTPRequestHandler):
                 if result_text.endswith("```"):
                     result_text = result_text[:-3]
 
-                # Parse JSON and validate with Pydantic
+                # Parse JSON and normalize
                 raw_data = json.loads(result_text.strip())
-                validated = parse_extraction_result(raw_data)
+                extraction = parse_extraction_result(raw_data)
 
-                # Convert to dict and add file names
-                extraction = validated.model_dump()
+                # Add file names
                 extraction["file_names"] = [f["filename"] for f in files]
 
                 return self.send_json(extraction)
