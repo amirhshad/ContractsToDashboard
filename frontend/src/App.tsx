@@ -6,6 +6,7 @@ import Upload from './pages/Upload'
 import Contracts from './pages/Contracts'
 import ContractDetail from './pages/ContractDetail'
 import Timeline from './pages/Timeline'
+import Recommendations from './pages/Recommendations'
 import Layout from './components/Layout'
 
 function App() {
@@ -32,6 +33,7 @@ function App() {
         <Route path="/contracts/:id/analysis" element={<ContractDetail />} />
         <Route path="/analysis" element={<ContractDetail />} />
         <Route path="/timeline" element={<Timeline />} />
+        <Route path="/recommendations" element={<Recommendations />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>
