@@ -1,6 +1,6 @@
 import { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Upload, FileText, LogOut, Search } from 'lucide-react'
+import { LayoutDashboard, Upload, FileText, LogOut, Search, Calendar } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 
 interface LayoutProps {
@@ -15,6 +15,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
     { path: '/upload', icon: Upload, label: 'Upload' },
     { path: '/contracts', icon: FileText, label: 'Contracts' },
+    { path: '/timeline', icon: Calendar, label: 'Timeline' },
     { path: '/analysis', icon: Search, label: 'Analysis' },
   ]
 
