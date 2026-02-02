@@ -28,7 +28,7 @@ export default function Layout({ children }: LayoutProps) {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center space-x-8">
               <h1 className="text-xl font-bold text-primary-600">
-                Contract Optimizer
+                Clausemate
               </h1>
               <nav className="hidden md:flex space-x-4">
                 {navItems.map(({ path, icon: Icon, label }) => (

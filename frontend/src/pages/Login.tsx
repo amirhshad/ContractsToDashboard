@@ -40,7 +40,7 @@ export default function Login() {
       <div className="max-w-md w-full space-y-8">
         <div>
           <h1 className="text-center text-3xl font-bold text-primary-600">
-            Contract Optimizer
+            Clausemate
           </h1>
           <h2 className="mt-6 text-center text-2xl font-bold text-gray-900">
             {isSignUp ? 'Create your account' : 'Sign in to your account'}

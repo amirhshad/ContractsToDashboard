@@ -168,7 +168,7 @@ class handler(BaseHTTPRequestHandler):
 
         # Health endpoints
         if path in ["/api/", "/api/health"]:
-            return self.send_json({"status": "healthy", "service": "Contract Optimizer API"})
+            return self.send_json({"status": "healthy", "service": "Clausemate API"})
 
         # Auth required endpoints
         token = parse_authorization(dict(self.headers))
