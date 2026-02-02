@@ -194,6 +194,7 @@ export default function Dashboard() {
                 <RecommendationCard
                   key={rec.id}
                   recommendation={rec}
+                  contracts={contracts}
                   onUpdate={loadRecommendations}
                 />
               ))}

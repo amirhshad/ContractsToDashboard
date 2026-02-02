@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   TrendingDown,
   Layers,
@@ -7,12 +8,14 @@ import {
   Check,
   X,
   DollarSign,
+  ExternalLink,
 } from 'lucide-react'
 import { updateRecommendation } from '../lib/api'
-import type { Recommendation } from '../types'
+import type { Recommendation, Contract } from '../types'
 
 interface RecommendationCardProps {
   recommendation: Recommendation
+  contracts: Contract[]
   onUpdate: () => void
 }
 
@@ -51,12 +54,18 @@ const priorityStyles = {
 
 export default function RecommendationCard({
   recommendation,
+  contracts,
   onUpdate,
 }: RecommendationCardProps) {
   const [updating, setUpdating] = useState(false)
 
   const config = typeConfig[recommendation.type]
   const Icon = config.icon
+
+  // Find the contract this recommendation refers to
+  const relatedContract = recommendation.contract_id
+    ? contracts.find(c => c.id === recommendation.contract_id)
+    : null
 
   const handleAction = async (action: 'accepted' | 'dismissed') => {
     try {
@@ -92,14 +101,28 @@ export default function RecommendationCard({
             </div>
             <p className="text-sm text-gray-600 mt-1">{recommendation.description}</p>
 
-            {recommendation.estimated_savings && (
-              <div className="flex items-center space-x-1 mt-2 text-green-600">
-                <DollarSign className="w-4 h-4" />
-                <span className="text-sm font-medium">
-                  Est. savings: ${recommendation.estimated_savings.toLocaleString()}/year
-                </span>
-              </div>
-            )}
+            <div className="flex flex-wrap items-center gap-3 mt-2">
+              {relatedContract && (
+                <Link
+                  to={`/contracts/${relatedContract.id}/analysis`}
+                  className="inline-flex items-center text-sm text-primary-600 hover:text-primary-700"
+                >
+                  <ExternalLink className="w-3 h-3 mr-1" />
+                  {relatedContract.provider_name}
+                </Link>
+              )}
+              {!relatedContract && recommendation.contract_id === null && (
+                <span className="text-sm text-gray-500 italic">Portfolio-wide</span>
+              )}
+              {recommendation.estimated_savings && (
+                <div className="flex items-center space-x-1 text-green-600">
+                  <DollarSign className="w-4 h-4" />
+                  <span className="text-sm font-medium">
+                    Est. savings: ${recommendation.estimated_savings.toLocaleString()}/year
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

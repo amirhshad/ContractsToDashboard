@@ -481,6 +481,158 @@ class handler(BaseHTTPRequestHandler):
                 error_details = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
                 return self.send_error_json(f"Failed to save contract: {error_details}", 500)
 
+        # Generate recommendations using AI
+        if path == "/api/recommendations/generate":
+            try:
+                import anthropic
+
+                # Fetch all user's contracts
+                contracts = supabase.table("contracts").select("*").eq("user_id", user_id).execute()
+
+                if not contracts.data:
+                    return self.send_json([])
+
+                # Build context for Claude
+                contracts_summary = []
+                for c in contracts.data:
+                    contracts_summary.append({
+                        "id": c["id"],
+                        "provider": c.get("provider_name"),
+                        "type": c.get("contract_type"),
+                        "monthly_cost": c.get("monthly_cost"),
+                        "annual_cost": c.get("annual_cost"),
+                        "start_date": c.get("start_date"),
+                        "end_date": c.get("end_date"),
+                        "auto_renewal": c.get("auto_renewal"),
+                        "cancellation_notice_days": c.get("cancellation_notice_days"),
+                        "key_terms": c.get("key_terms", []),
+                        "risks": c.get("risks", []),
+                    })
+
+                prompt = f"""Analyze these contracts and provide actionable recommendations.
+
+CONTRACTS:
+{json.dumps(contracts_summary, indent=2)}
+
+Generate recommendations in this JSON format. Each recommendation should reference a specific contract_id when applicable, or be null for portfolio-wide recommendations:
+
+{{
+    "recommendations": [
+        {{
+            "contract_id": "uuid or null for portfolio-wide",
+            "type": "cost_reduction | consolidation | risk_alert | renewal_reminder",
+            "title": "Short actionable title",
+            "description": "Detailed explanation and action steps",
+            "estimated_savings": number or null,
+            "priority": "high | medium | low",
+            "reasoning": "Why this recommendation matters"
+        }}
+    ]
+}}
+
+Focus on:
+1. Cost reduction opportunities (negotiate, switch providers, remove unused services)
+2. Consolidation (combine similar contracts for better rates)
+3. Risk alerts (auto-renewals, unfavorable terms, missing cancellation windows)
+4. Renewal reminders (contracts expiring soon that need attention)
+
+Provide 3-7 specific, actionable recommendations. Return ONLY valid JSON."""
+
+                client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
+                response = client.messages.create(
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=2048,
+                    messages=[{"role": "user", "content": prompt}]
+                )
+
+                result_text = response.content[0].text
+                if result_text.startswith("```json"):
+                    result_text = result_text[7:]
+                if result_text.startswith("```"):
+                    result_text = result_text[3:]
+                if result_text.endswith("```"):
+                    result_text = result_text[:-3]
+
+                ai_result = json.loads(result_text.strip())
+                recommendations = ai_result.get("recommendations", [])
+
+                # Clear old pending recommendations for this user
+                supabase.table("recommendations").delete().eq("user_id", user_id).in_("status", ["pending", "viewed"]).execute()
+
+                # Insert new recommendations
+                inserted = []
+                for rec in recommendations:
+                    rec_data = {
+                        "user_id": user_id,
+                        "contract_id": rec.get("contract_id"),
+                        "type": rec.get("type", "cost_reduction"),
+                        "title": rec.get("title", "Recommendation"),
+                        "description": rec.get("description", ""),
+                        "estimated_savings": rec.get("estimated_savings"),
+                        "priority": rec.get("priority", "medium"),
+                        "status": "pending",
+                        "reasoning": rec.get("reasoning"),
+                    }
+                    result = supabase.table("recommendations").insert(rec_data).execute()
+                    if result.data:
+                        inserted.append(result.data[0])
+
+                return self.send_json(inserted)
+
+            except Exception as e:
+                import traceback
+                error_details = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
+                return self.send_error_json(f"Failed to generate recommendations: {error_details}", 500)
+
+        return self.send_error_json("Not found", 404)
+
+    def do_PUT(self):
+        """Handle PUT requests."""
+        path = urlparse(self.path).path
+
+        token = parse_authorization(dict(self.headers))
+        if not token:
+            return self.send_error_json("No token provided", 401)
+
+        try:
+            user_id = get_user_from_token(token)
+        except Exception as e:
+            return self.send_error_json(f"Invalid token: {str(e)}", 401)
+
+        supabase = get_supabase_client()
+
+        # Update recommendation status
+        if path.startswith("/api/recommendations/"):
+            try:
+                rec_id = path.split("/")[-1]
+
+                # Read body
+                content_length = int(self.headers.get("Content-Length", 0))
+                body = self.rfile.read(content_length)
+                data = json.loads(body.decode()) if body else {}
+
+                status = data.get("status")
+                if status not in ["accepted", "dismissed"]:
+                    return self.send_error_json("Invalid status", 400)
+
+                # Verify ownership
+                existing = supabase.table("recommendations").select("id").eq("id", rec_id).eq("user_id", user_id).single().execute()
+                if not existing.data:
+                    return self.send_error_json("Recommendation not found", 404)
+
+                # Update status
+                result = supabase.table("recommendations").update({
+                    "status": status,
+                    "acted_on_at": "now()"
+                }).eq("id", rec_id).execute()
+
+                return self.send_json(result.data[0] if result.data else {"status": "updated"})
+
+            except Exception as e:
+                import traceback
+                error_details = f"{type(e).__name__}: {str(e)}\n{traceback.format_exc()}"
+                return self.send_error_json(f"Failed to update recommendation: {error_details}", 500)
+
         return self.send_error_json("Not found", 404)
 
     def do_DELETE(self):
