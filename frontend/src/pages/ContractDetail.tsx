@@ -117,11 +117,27 @@ export default function ContractDetail() {
           className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-primary-500 focus:border-primary-500"
         >
           <option value="">Choose a contract...</option>
-          {contracts.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.provider_name} - {c.contract_type || 'Unknown type'}
-            </option>
-          ))}
+          {contracts.map((c) => {
+            // Build a descriptive label with distinguishing info
+            const parts = [c.provider_name]
+            if (c.contract_type) parts.push(c.contract_type)
+            if (c.file_name) {
+              // Show shortened filename
+              const shortName = c.file_name.replace('.pdf', '').slice(0, 30)
+              parts.push(`"${shortName}"`)
+            }
+            if (c.end_date) {
+              parts.push(`expires ${new Date(c.end_date).toLocaleDateString()}`)
+            }
+            if (c.monthly_cost) {
+              parts.push(`$${c.monthly_cost}/mo`)
+            }
+            return (
+              <option key={c.id} value={c.id}>
+                {parts.join(' - ')}
+              </option>
+            )
+          })}
         </select>
       </div>
 
