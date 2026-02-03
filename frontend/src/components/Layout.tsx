@@ -21,7 +21,7 @@ export default function Layout({ children }: LayoutProps) {
   ]
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 overflow-x-hidden">
       {/* Header */}
       <header className="bg-white border-b border-gray-200">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -62,20 +62,20 @@ export default function Layout({ children }: LayoutProps) {
       </header>
 
       {/* Mobile nav */}
-      <nav className="md:hidden bg-white border-b border-gray-200">
-        <div className="flex justify-around py-2">
+      <nav className="md:hidden bg-white border-b border-gray-200 overflow-x-auto">
+        <div className="flex justify-between min-w-max px-2 py-2">
           {navItems.map(({ path, icon: Icon, label }) => (
             <Link
               key={path}
               to={path}
-              className={`flex flex-col items-center px-3 py-2 text-xs ${
+              className={`flex flex-col items-center px-2 py-2 text-xs flex-shrink-0 ${
                 location.pathname === path || (path === '/analysis' && location.pathname.includes('/analysis'))
                   ? 'text-primary-600'
                   : 'text-gray-600'
               }`}
             >
               <Icon className="w-5 h-5 mb-1" />
-              <span>{label}</span>
+              <span className="whitespace-nowrap">{label}</span>
             </Link>
           ))}
         </div>
