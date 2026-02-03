@@ -120,7 +120,7 @@ REQUIRED OUTPUT FORMAT:
     "end_date": "YYYY-MM-DD or null",
     "auto_renewal": true | false | null,
     "cancellation_notice_days": 0,
-    "key_terms": ["Important terms from ALL documents"],
+    "key_terms": ["COMPLETE and DETAILED terms - see KEY TERMS EXTRACTION RULES below"],
     "parties": [
         {
             "name": "Full legal name of party",
@@ -172,13 +172,62 @@ CONTRACT TYPE GUIDANCE:
 - service: Consulting, maintenance, professional services
 - other: Anything that doesn't fit above
 
+TYPE-SPECIFIC KEY TERMS TO CAPTURE:
+For RENTAL contracts - capture ALL of:
+  * Rent amount and payment schedule
+  * ALL rent adjustment mechanisms (CPI, fixed %, market rate, AND any additional increases)
+  * Security deposit amount and return conditions
+  * Maintenance responsibilities (who pays for what)
+  * Permitted use and restrictions
+  * Subletting/assignment rights
+  * Break clauses and early termination conditions
+For INSURANCE contracts:
+  * Coverage limits and deductibles
+  * Exclusions and waiting periods
+  * Claim procedures and timeframes
+For SAAS/SUBSCRIPTION:
+  * User/seat limits and overage charges
+  * Data retention and export rights
+  * SLAs and uptime guarantees
+  * Auto-renewal and price increase terms
+
 FIELD EXTRACTION RULES:
 1. provider_name: Main company providing the service (not the customer)
 2. parties: Extract ALL parties (usually 2+), identify their contractual roles
 3. costs: Convert to numbers only (no currency symbols). Detect currency separately.
 4. dates: Always use YYYY-MM-DD format
 5. confidence: 0.9+ for clear documents, 0.6-0.8 for partial info, <0.6 for unclear
-6. key_terms: Include renewal terms, limitations, important obligations, SLAs
+
+KEY TERMS EXTRACTION RULES (CONCISE & SCANNABLE):
+Extract key_terms as SHORT, SCANNABLE bullet points. Each term should be:
+- Brief: 10-15 words max, like a bullet point
+- Complete: Include specific numbers/percentages but skip unnecessary words
+- Structured: "Category: value (reference)" format when possible
+- Readable: Plain language, avoid legal jargon
+
+FORMAT: "[Topic]: [Key info] ([Article/Section ref])"
+
+EXAMPLES of GOOD key_terms (concise):
+- "Rent increase: CPI + up to 5% additional (Art. 5.2)"
+- "Cancellation: 30 days notice, 2 months penalty (Sec. 12.3)"
+- "SLA: 99.9% uptime, 10% credit per hour below (Sec. 7)"
+- "Price escalation: 3-5% annually (Clause 8)"
+- "Liability cap: 12 months fees, excludes negligence (Sec. 9.2)"
+- "Auto-renewal: 12 months unless 60 days notice"
+- "Deposit: 3 months rent, returned within 30 days"
+- "Maintenance: Tenant pays minor (<€500), Landlord pays major"
+
+EXAMPLES of BAD key_terms (too long - DO NOT do this):
+- "Annual rent increases based on the Consumer Price Index as published by CBS plus additional landlord increase of up to 5% per Article 5.2" (TOO VERBOSE)
+- "The tenant must provide thirty days written notice prior to cancellation and will be subject to an early termination fee equivalent to two months rent as specified in Section 12.3" (TOO WORDY)
+
+CATEGORIES to extract (be brief for each):
+- Payment: Costs, adjustments, escalations
+- Renewal/Exit: Auto-renewal, notice periods, penalties
+- Performance: SLAs, guarantees
+- Liability: Caps, indemnification
+- Rights: IP, data, confidentiality
+- Duration: Term, renewal periods
 
 Return ONLY the JSON object. Do not include any other text."""
 
@@ -266,11 +315,23 @@ def needs_escalation(extraction: dict) -> bool:
     """Check if extraction needs escalation to a more powerful model."""
     confidence = extraction.get("confidence", 0.0)
     complexity = extraction.get("complexity", "medium")
+    contract_type = extraction.get("contract_type", "").lower() if extraction.get("contract_type") else ""
 
     # Escalate if low confidence (< 0.7) or high complexity
     if confidence < 0.7:
         return True
     if complexity == "high":
+        return True
+
+    # Contract types that require more thorough analysis
+    # These have complex legal terms that simpler models often miss
+    complex_contract_types = {"rental", "insurance", "service"}
+    if contract_type in complex_contract_types:
+        return True
+
+    # Escalate if many key terms detected (likely complex contract)
+    key_terms = extraction.get("key_terms", [])
+    if len(key_terms) >= 6:
         return True
 
     return False
@@ -295,7 +356,7 @@ def extract_with_gemini(files, files_metadata, model_name="gemini-3-flash-previe
     genai.configure(api_key=GEMINI_API_KEY)
 
     # Default: Gemini 3 Flash (fast, cost-effective)
-    # Fallback options: gemini-2.5-pro, gemini-1.5-pro
+    # Escalation options: gemini-2.0-pro (preferred), claude-sonnet-4 (fallback)
     model = genai.GenerativeModel(model_name)
 
     # Build content parts for Gemini
@@ -390,17 +451,20 @@ def generate_recommendations_with_gemini(contracts_summary):
     genai.configure(api_key=GEMINI_API_KEY)
     model = genai.GenerativeModel("gemini-3-flash-preview")
 
-    prompt = f"""Analyze these contracts and provide actionable recommendations.
+    prompt = f"""Analyze these NEWLY ADDED contracts and provide actionable recommendations.
 
-CONTRACTS:
+IMPORTANT: These are NEW contracts just uploaded by the user. Focus your analysis ONLY on these specific contracts.
+Do NOT reference or make assumptions about other contracts that may exist.
+
+NEW CONTRACTS TO ANALYZE:
 {json.dumps(contracts_summary, indent=2)}
 
-Generate recommendations in this JSON format. Each recommendation should reference a specific contract_id when applicable, or be null for portfolio-wide recommendations:
+Generate recommendations in this JSON format. Each recommendation MUST reference a specific contract_id from the list above:
 
 {{
     "recommendations": [
         {{
-            "contract_id": "uuid or null for portfolio-wide",
+            "contract_id": "uuid from the contracts above (REQUIRED)",
             "type": "cost_reduction | consolidation | risk_alert | renewal_reminder",
             "title": "Short actionable title",
             "description": "Detailed explanation and action steps",
@@ -412,12 +476,12 @@ Generate recommendations in this JSON format. Each recommendation should referen
 }}
 
 Focus on:
-1. Cost reduction opportunities (negotiate, switch providers, remove unused services)
-2. Consolidation (combine similar contracts for better rates)
-3. Risk alerts (auto-renewals, unfavorable terms, missing cancellation windows)
-4. Renewal reminders (contracts expiring soon that need attention)
+1. Risk alerts (auto-renewals, unfavorable terms, missing cancellation windows, price escalation clauses)
+2. Renewal reminders (contracts expiring soon that need attention)
+3. Cost reduction opportunities (negotiate, switch providers, remove unused services)
+4. Key terms awareness (important clauses the user should know about)
 
-Provide 3-7 specific, actionable recommendations. Return ONLY valid JSON."""
+Provide 2-5 specific, actionable recommendations per contract. Return ONLY valid JSON."""
 
     response = model.generate_content(
         prompt,
@@ -438,17 +502,20 @@ def generate_recommendations_with_claude(contracts_summary):
 
     client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
-    prompt = f"""Analyze these contracts and provide actionable recommendations.
+    prompt = f"""Analyze these NEWLY ADDED contracts and provide actionable recommendations.
 
-CONTRACTS:
+IMPORTANT: These are NEW contracts just uploaded by the user. Focus your analysis ONLY on these specific contracts.
+Do NOT reference or make assumptions about other contracts that may exist.
+
+NEW CONTRACTS TO ANALYZE:
 {json.dumps(contracts_summary, indent=2)}
 
-Generate recommendations in this JSON format. Each recommendation should reference a specific contract_id when applicable, or be null for portfolio-wide recommendations:
+Generate recommendations in this JSON format. Each recommendation MUST reference a specific contract_id from the list above:
 
 {{
     "recommendations": [
         {{
-            "contract_id": "uuid or null for portfolio-wide",
+            "contract_id": "uuid from the contracts above (REQUIRED)",
             "type": "cost_reduction | consolidation | risk_alert | renewal_reminder",
             "title": "Short actionable title",
             "description": "Detailed explanation and action steps",
@@ -460,12 +527,12 @@ Generate recommendations in this JSON format. Each recommendation should referen
 }}
 
 Focus on:
-1. Cost reduction opportunities (negotiate, switch providers, remove unused services)
-2. Consolidation (combine similar contracts for better rates)
-3. Risk alerts (auto-renewals, unfavorable terms, missing cancellation windows)
-4. Renewal reminders (contracts expiring soon that need attention)
+1. Risk alerts (auto-renewals, unfavorable terms, missing cancellation windows, price escalation clauses)
+2. Renewal reminders (contracts expiring soon that need attention)
+3. Cost reduction opportunities (negotiate, switch providers, remove unused services)
+4. Key terms awareness (important clauses the user should know about)
 
-Provide 3-7 specific, actionable recommendations. Return ONLY valid JSON."""
+Provide 2-5 specific, actionable recommendations per contract. Return ONLY valid JSON."""
 
     response = client.messages.create(
         model="claude-sonnet-4-20250514",
@@ -520,10 +587,9 @@ class handler(BaseHTTPRequestHandler):
             elif GEMINI_API_KEY:
                 routing_config["primary"] = "gemini-3-flash"
                 routing_config["smart_routing"] = True
+                routing_config["escalation"] = "gemini-2.5-pro"
                 if ANTHROPIC_API_KEY:
-                    routing_config["escalation"] = "claude-sonnet-4"
-                else:
-                    routing_config["escalation"] = "gemini-2.5-pro"
+                    routing_config["fallback"] = "claude-sonnet-4"
             elif ANTHROPIC_API_KEY:
                 routing_config["primary"] = "claude-sonnet-4 (fallback)"
                 routing_config["smart_routing"] = False
@@ -671,16 +737,19 @@ class handler(BaseHTTPRequestHandler):
 
                     # Smart routing: escalate if low confidence or high complexity
                     if needs_escalation(initial_extraction):
-                        # Try Claude Sonnet 4 first (highest quality), fallback to Gemini Pro
-                        if ANTHROPIC_API_KEY:
-                            raw_data = extract_with_claude(files, files_metadata)
-                            escalated = True
-                            escalation_model = "claude-sonnet-4"
-                        else:
-                            # Fallback to Gemini 2.5 Pro for complex contracts
-                            raw_data = extract_with_gemini(files, files_metadata, "gemini-2.5-pro-preview-05-06")
+                        # Try Gemini Pro first (preferred), fallback to Claude Sonnet 4
+                        try:
+                            raw_data = extract_with_gemini(files, files_metadata, "gemini-2.5-pro")
                             escalated = True
                             escalation_model = "gemini-2.5-pro"
+                        except Exception as gemini_error:
+                            # Fallback to Claude Sonnet 4 if Gemini Pro fails
+                            if ANTHROPIC_API_KEY:
+                                raw_data = extract_with_claude(files, files_metadata)
+                                escalated = True
+                                escalation_model = "claude-sonnet-4"
+                            else:
+                                raise gemini_error
                 elif ANTHROPIC_API_KEY:
                     # Fallback to Claude if Gemini key not available
                     raw_data = extract_with_claude(files, files_metadata)
@@ -841,12 +910,27 @@ class handler(BaseHTTPRequestHandler):
                 if not contracts.data:
                     return self.send_json([])
 
-                # Build context for AI
+                # Get contract IDs that already have recommendations (any status)
+                existing_recs = supabase.table("recommendations").select("contract_id").eq("user_id", user_id).execute()
+                analyzed_contract_ids = set()
+                for rec in (existing_recs.data or []):
+                    if rec.get("contract_id"):
+                        analyzed_contract_ids.add(rec["contract_id"])
+
+                # Filter to only NEW contracts (not yet analyzed)
+                new_contracts = [c for c in contracts.data if c["id"] not in analyzed_contract_ids]
+
+                if not new_contracts:
+                    # No new contracts to analyze
+                    return self.send_json([])
+
+                # Build context for AI - only new contracts
                 contracts_summary = []
-                for c in contracts.data:
+                for c in new_contracts:
                     contracts_summary.append({
                         "id": c["id"],
                         "provider": c.get("provider_name"),
+                        "nickname": c.get("contract_nickname"),
                         "type": c.get("contract_type"),
                         "monthly_cost": c.get("monthly_cost"),
                         "annual_cost": c.get("annual_cost"),
@@ -871,10 +955,7 @@ class handler(BaseHTTPRequestHandler):
 
                 recommendations = ai_result.get("recommendations", [])
 
-                # Clear old pending recommendations for this user
-                supabase.table("recommendations").delete().eq("user_id", user_id).in_("status", ["pending", "viewed"]).execute()
-
-                # Insert new recommendations
+                # Insert new recommendations (don't delete old ones - they're for previous contracts)
                 inserted = []
                 for rec in recommendations:
                     rec_data = {

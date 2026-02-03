@@ -234,8 +234,8 @@ export default function Timeline() {
         </div>
       )}
 
-      {/* Timeline Visualization */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      {/* Timeline Visualization - Desktop */}
+      <div className="hidden md:block bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <h2 className="font-semibold text-gray-900 mb-4">Contract Periods</h2>
 
         {/* Month labels */}
@@ -335,6 +335,105 @@ export default function Timeline() {
           <div className="flex items-center gap-2">
             <div className="w-0.5 h-4 bg-primary-500" />
             <span className="text-gray-600">Today</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Timeline Visualization - Mobile (Card-based) */}
+      <div className="md:hidden bg-white rounded-lg shadow-sm border border-gray-200 p-4">
+        <h2 className="font-semibold text-gray-900 mb-4">Contract Periods</h2>
+
+        {contractBars.length === 0 ? (
+          <div className="text-center py-8 text-gray-500">
+            No contracts with dates to display
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {contractBars.map((bar) => {
+              const isPast = bar.endDate && bar.endDate < new Date()
+              const today = new Date()
+              const daysUntilEnd = bar.endDate
+                ? Math.ceil((bar.endDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24))
+                : null
+
+              return (
+                <Link
+                  key={bar.id}
+                  to={`/contracts/${bar.id}/analysis`}
+                  className={`block p-4 rounded-lg border-l-4 ${
+                    isPast
+                      ? 'bg-gray-50 border-gray-300'
+                      : bar.autoRenewal
+                      ? 'bg-yellow-50 border-yellow-400'
+                      : 'bg-primary-50 border-primary-400'
+                  }`}
+                >
+                  <div className="flex items-start justify-between mb-2">
+                    <div className="flex-1 min-w-0">
+                      <p className="font-medium text-gray-900 truncate">
+                        {bar.nickname || bar.provider}
+                      </p>
+                      <p className="text-sm text-gray-500">
+                        {bar.type || 'Contract'}
+                        {bar.monthlyCost && ` • $${bar.monthlyCost}/mo`}
+                      </p>
+                    </div>
+                    {bar.autoRenewal && (
+                      <span className="flex items-center text-xs text-yellow-700 bg-yellow-100 px-2 py-1 rounded-full">
+                        <RefreshCw className="w-3 h-3 mr-1" />
+                        Auto
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <div className="text-gray-600">
+                      <span className="font-medium">
+                        {bar.startDate?.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }) || '?'}
+                      </span>
+                      <span className="mx-2">→</span>
+                      <span className="font-medium">
+                        {bar.endDate?.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }) || 'Ongoing'}
+                      </span>
+                    </div>
+
+                    {daysUntilEnd !== null && (
+                      <span className={`text-xs font-medium ${
+                        isPast
+                          ? 'text-gray-500'
+                          : daysUntilEnd <= 30
+                          ? 'text-red-600'
+                          : daysUntilEnd <= 90
+                          ? 'text-yellow-600'
+                          : 'text-green-600'
+                      }`}>
+                        {isPast
+                          ? 'Expired'
+                          : daysUntilEnd === 0
+                          ? 'Today'
+                          : `${daysUntilEnd}d left`}
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Mobile Legend */}
+        <div className="flex flex-wrap items-center gap-4 mt-4 pt-4 border-t text-xs">
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-primary-400" />
+            <span className="text-gray-600">Fixed</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-yellow-400" />
+            <span className="text-gray-600">Auto-renew</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <div className="w-3 h-3 rounded bg-gray-300" />
+            <span className="text-gray-600">Expired</span>
           </div>
         </div>
       </div>

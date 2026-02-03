@@ -12,12 +12,12 @@ export default function Layout({ children }: LayoutProps) {
   const location = useLocation()
 
   const navItems = [
-    { path: '/', icon: LayoutDashboard, label: 'Dashboard' },
-    { path: '/upload', icon: Upload, label: 'Upload' },
-    { path: '/contracts', icon: FileText, label: 'Contracts' },
-    { path: '/timeline', icon: Calendar, label: 'Timeline' },
-    { path: '/analysis', icon: Search, label: 'Analysis' },
-    { path: '/recommendations', icon: Sparkles, label: 'AI Insights' },
+    { path: '/', icon: LayoutDashboard, label: 'Dashboard', mobileLabel: 'Home' },
+    { path: '/upload', icon: Upload, label: 'Upload', mobileLabel: 'Upload' },
+    { path: '/contracts', icon: FileText, label: 'Contracts', mobileLabel: 'Contracts' },
+    { path: '/timeline', icon: Calendar, label: 'Timeline', mobileLabel: 'Timeline' },
+    { path: '/analysis', icon: Search, label: 'Analysis', mobileLabel: 'Analysis' },
+    { path: '/recommendations', icon: Sparkles, label: 'AI Insights', mobileLabel: 'Insights' },
   ]
 
   return (
@@ -62,20 +62,20 @@ export default function Layout({ children }: LayoutProps) {
       </header>
 
       {/* Mobile nav */}
-      <nav className="md:hidden bg-white border-b border-gray-200">
-        <div className="flex justify-around py-2">
-          {navItems.map(({ path, icon: Icon, label }) => (
+      <nav className="md:hidden bg-white border-b border-gray-200 overflow-x-auto">
+        <div className="flex justify-between min-w-max px-2 py-2">
+          {navItems.map(({ path, icon: Icon, mobileLabel }) => (
             <Link
               key={path}
               to={path}
-              className={`flex flex-col items-center px-3 py-2 text-xs ${
+              className={`flex flex-col items-center px-2 py-1 text-[10px] min-w-[52px] ${
                 location.pathname === path || (path === '/analysis' && location.pathname.includes('/analysis'))
                   ? 'text-primary-600'
                   : 'text-gray-600'
               }`}
             >
-              <Icon className="w-5 h-5 mb-1" />
-              <span>{label}</span>
+              <Icon className="w-5 h-5 mb-0.5" />
+              <span className="truncate">{mobileLabel}</span>
             </Link>
           ))}
         </div>
