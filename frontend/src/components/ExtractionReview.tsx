@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Check, X, AlertCircle } from 'lucide-react'
+import { Check, X, AlertCircle, Zap } from 'lucide-react'
 import type { ExtractionResult } from '../types'
 import { CURRENCY_OPTIONS, getCurrencySymbol } from '../types'
 
@@ -45,11 +45,22 @@ export default function ExtractionReview({
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6 space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold text-gray-900">Review Extracted Data</h2>
-        <span
-          className={`px-3 py-1 rounded-full text-sm font-medium ${confidenceColor}`}
-        >
-          {Math.round(confidence * 100)}% confidence
-        </span>
+        <div className="flex items-center gap-2">
+          {extraction.escalated && (
+            <span
+              className="flex items-center gap-1 px-3 py-1 rounded-full text-sm font-medium text-purple-700 bg-purple-50"
+              title={`Enhanced with ${extraction.escalation_model || 'advanced model'}`}
+            >
+              <Zap className="w-3.5 h-3.5" />
+              Enhanced
+            </span>
+          )}
+          <span
+            className={`px-3 py-1 rounded-full text-sm font-medium ${confidenceColor}`}
+          >
+            {Math.round(confidence * 100)}% confidence
+          </span>
+        </div>
       </div>
 
       {confidence < 0.6 && (
@@ -58,6 +69,15 @@ export default function ExtractionReview({
           <p className="text-sm text-yellow-700">
             The AI had difficulty extracting some data. Please review and correct the
             fields below.
+          </p>
+        </div>
+      )}
+
+      {extraction.escalated && (
+        <div className="flex items-start space-x-2 p-3 bg-purple-50 border border-purple-200 rounded-md">
+          <Zap className="w-5 h-5 text-purple-600 flex-shrink-0 mt-0.5" />
+          <p className="text-sm text-purple-700">
+            This contract was analyzed with enhanced AI ({extraction.escalation_model === 'claude-sonnet-4' ? 'Claude Sonnet 4' : 'Gemini 2.5 Pro'}) for more thorough extraction of complex terms.
           </p>
         </div>
       )}

@@ -153,9 +153,9 @@ This project is a full-stack application for managing contracts and getting AI-p
 
 ### Deployment
 
-**Live URL:** https://contracts-dashboard.vercel.app
+**Live URL:** https://clausemate.vercel.app
 
-**GitHub:** https://github.com/amirhshad/ContractsToDashboard
+**GitHub:** https://github.com/amirhshad/clausemate
 
 **Deploy commands:**
 ```bash

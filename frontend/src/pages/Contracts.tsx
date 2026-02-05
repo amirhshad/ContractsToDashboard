@@ -1,7 +1,8 @@
 import { useState } from 'react'
-import { FileText, Trash2, Search, Filter } from 'lucide-react'
+import { FileText, Trash2, Search, Filter, Download } from 'lucide-react'
 import { useContracts } from '../hooks/useContracts'
 import { getCurrencySymbol } from '../types'
+import type { Contract } from '../types'
 
 export default function Contracts() {
   const { contracts, loading, error, deleteContract } = useContracts()
@@ -13,10 +14,54 @@ export default function Contracts() {
     const searchLower = search.toLowerCase()
     const matchesSearch =
       contract.provider_name.toLowerCase().includes(searchLower) ||
-      (contract.contract_nickname?.toLowerCase().includes(searchLower) ?? false)
+      (contract.contract_nickname?.toLowerCase().includes(searchLower) ?? false) ||
+      (contract.contract_type?.toLowerCase().includes(searchLower) ?? false) ||
+      (contract.key_terms?.some(term => term.toLowerCase().includes(searchLower)) ?? false)
     const matchesType = !typeFilter || contract.contract_type === typeFilter
     return matchesSearch && matchesType
   })
+
+  const exportToCSV = () => {
+    const headers = [
+      'Contract Name',
+      'Provider',
+      'Type',
+      'Monthly Cost',
+      'Annual Cost',
+      'Currency',
+      'Start Date',
+      'End Date',
+      'Auto Renewal',
+      'Cancellation Notice (Days)',
+      'Key Terms'
+    ]
+
+    const rows = filteredContracts.map((contract: Contract) => [
+      contract.contract_nickname || '',
+      contract.provider_name,
+      contract.contract_type || '',
+      contract.monthly_cost?.toString() || '',
+      contract.annual_cost?.toString() || '',
+      contract.currency || 'USD',
+      contract.start_date || '',
+      contract.end_date || '',
+      contract.auto_renewal ? 'Yes' : 'No',
+      contract.cancellation_notice_days?.toString() || '',
+      (contract.key_terms || []).join('; ')
+    ])
+
+    const csvContent = [
+      headers.join(','),
+      ...rows.map(row => row.map(cell => `"${cell.replace(/"/g, '""')}"`).join(','))
+    ].join('\n')
+
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = `clausemate-contracts-${new Date().toISOString().split('T')[0]}.csv`
+    link.click()
+    URL.revokeObjectURL(link.href)
+  }
 
   const contractTypes = [...new Set(contracts.map((c) => c.contract_type).filter(Boolean))]
 
@@ -69,7 +114,7 @@ export default function Contracts() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
           <input
             type="text"
-            placeholder="Search contracts..."
+            placeholder="Search contracts, providers, key terms..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent"
@@ -90,6 +135,14 @@ export default function Contracts() {
             ))}
           </select>
         </div>
+        <button
+          onClick={exportToCSV}
+          disabled={filteredContracts.length === 0}
+          className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed text-gray-700"
+        >
+          <Download className="w-4 h-4" />
+          <span className="hidden sm:inline">Export CSV</span>
+        </button>
       </div>
 
       {/* Empty state */}

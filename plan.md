@@ -1,4 +1,4 @@
-# ContractsToDashboard - Implementation Plan
+# Clausemate - Implementation Plan
 
 ## Project Overview
 
