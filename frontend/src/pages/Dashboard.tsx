@@ -13,6 +13,7 @@ import { useContracts } from '../hooks/useContracts'
 import { getRecommendations, generateRecommendations } from '../lib/api'
 import type { Recommendation } from '../types'
 import RecommendationCard from '../components/RecommendationCard'
+import SpendingCharts from '../components/SpendingCharts'
 
 export default function Dashboard() {
   const { contracts, summary, loading, error } = useContracts()
@@ -129,6 +130,9 @@ export default function Dashboard() {
           </div>
         ))}
       </div>
+
+      {/* Spending Charts */}
+      {contracts.length > 0 && <SpendingCharts contracts={contracts} />}
 
       {/* Empty State */}
       {contracts.length === 0 && (

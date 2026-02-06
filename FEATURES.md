@@ -14,6 +14,7 @@
 - [x] Mobile-responsive design
 - [x] **Full-text search** (providers, nicknames, types, key terms)
 - [x] **Export to CSV** (download contracts as spreadsheet)
+- [x] **Spending Charts** (category pie chart, 12-month projection)
 
 ---
 
@@ -41,11 +42,11 @@
 
 ## Phase 2: Core Improvements
 
-### Spending Charts
-- [ ] Monthly/yearly spending trends
-- [ ] Category breakdown pie chart
-- [ ] Cost projections based on renewals
-- **Tech:** Recharts library
+### Spending Charts ✅
+- [x] Monthly/yearly spending trends
+- [x] Category breakdown pie chart
+- [x] Cost projections based on renewals
+- **Tech:** Recharts library (implemented)
 
 ### Tags & Labels
 - [ ] Custom tags for organizing contracts
