@@ -51,7 +51,7 @@ export default function Layout({ children }: LayoutProps) {
                 ))}
               </nav>
             </div>
-            <div className="flex items-center space-x-4">
+            <div className="flex items-center space-x-6">
               <span className="text-sm font-medium text-gray-700">{displayName}</span>
               <button
                 onClick={signOut}
