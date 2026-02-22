@@ -7,6 +7,7 @@ import Contracts from './pages/Contracts'
 import ContractDetail from './pages/ContractDetail'
 import Timeline from './pages/Timeline'
 import Recommendations from './pages/Recommendations'
+import Settings from './pages/Settings'
 import Layout from './components/Layout'
 
 function App() {
@@ -34,6 +35,7 @@ function App() {
         <Route path="/analysis" element={<ContractDetail />} />
         <Route path="/timeline" element={<Timeline />} />
         <Route path="/recommendations" element={<Recommendations />} />
+        <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </Layout>

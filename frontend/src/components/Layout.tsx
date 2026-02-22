@@ -1,6 +1,6 @@
 import { ReactNode } from 'react'
 import { Link, useLocation } from 'react-router-dom'
-import { LayoutDashboard, Upload, FileText, LogOut, Search, Calendar, Sparkles } from 'lucide-react'
+import { LayoutDashboard, Upload, FileText, LogOut, Search, Calendar, Sparkles, Settings } from 'lucide-react'
 import { useAuth } from '../hooks/useAuth'
 
 interface LayoutProps {
@@ -18,6 +18,7 @@ export default function Layout({ children }: LayoutProps) {
     { path: '/timeline', icon: Calendar, label: 'Timeline', mobileLabel: 'Timeline' },
     { path: '/analysis', icon: Search, label: 'Analysis', mobileLabel: 'Analysis' },
     { path: '/recommendations', icon: Sparkles, label: 'AI Insights', mobileLabel: 'Insights' },
+    { path: '/settings', icon: Settings, label: 'Settings', mobileLabel: 'Settings' },
   ]
 
   return (
@@ -48,6 +49,13 @@ export default function Layout({ children }: LayoutProps) {
               </nav>
             </div>
             <div className="flex items-center space-x-4">
+              <Link
+                to="/settings"
+                className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <Settings className="w-4 h-4" />
+                <span className="hidden sm:inline">Settings</span>
+              </Link>
               <span className="text-sm text-gray-600">{user?.email}</span>
               <button
                 onClick={signOut}
