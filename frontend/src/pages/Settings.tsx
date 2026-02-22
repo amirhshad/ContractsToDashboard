@@ -1,8 +1,15 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useAuth } from '../hooks/useAuth'
+import { supabase } from '../lib/supabase'
 import { Settings, Lock, Save, AlertCircle, CheckCircle, User, Bell, Trash2, Building2 } from 'lucide-react'
 
 type Section = 'profile' | 'security' | 'notifications' | 'danger'
+
+interface NotificationPrefs {
+  email_reminders_enabled: boolean
+  analysis_notifications: boolean
+  weekly_summary_enabled: boolean
+}
 
 export default function SettingsPage() {
   const { updatePassword, updateProfile, user } = useAuth()
@@ -19,6 +26,36 @@ export default function SettingsPage() {
   const [displayName, setDisplayName] = useState(user?.user_metadata?.display_name || '')
   const [company, setCompany] = useState(user?.user_metadata?.company || '')
   const [profileSaved, setProfileSaved] = useState(false)
+
+  // Notification state
+  const [notifPrefs, setNotifPrefs] = useState<NotificationPrefs>({
+    email_reminders_enabled: true,
+    analysis_notifications: true,
+    weekly_summary_enabled: false,
+  })
+  const [notifSaved, setNotifSaved] = useState(false)
+  const [notifLoading, setNotifLoading] = useState(false)
+
+  // Load notification preferences
+  useEffect(() => {
+    async function loadNotifPrefs() {
+      if (!user) return
+      const { data } = await supabase
+        .from('user_notification_preferences')
+        .select('*')
+        .eq('user_id', user.id)
+        .single()
+      
+      if (data) {
+        setNotifPrefs({
+          email_reminders_enabled: data.email_reminders_enabled ?? true,
+          analysis_notifications: data.analysis_notifications ?? true,
+          weekly_summary_enabled: data.weekly_summary_enabled ?? false,
+        })
+      }
+    }
+    loadNotifPrefs()
+  }, [user])
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -67,6 +104,31 @@ export default function SettingsPage() {
     }
   }
 
+  const handleNotifSave = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!user) return
+    
+    setNotifLoading(true)
+    setError(null)
+    try {
+      const { error } = await supabase
+        .from('user_notification_preferences')
+        .upsert({
+          user_id: user.id,
+          ...notifPrefs,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_id' })
+
+      if (error) throw error
+      setNotifSaved(true)
+      setTimeout(() => setNotifSaved(false), 3000)
+    } catch (err: any) {
+      setError(err.message)
+    } finally {
+      setNotifLoading(false)
+    }
+  }
+
   const sections = [
     { id: 'profile', label: 'Profile', icon: User },
     { id: 'security', label: 'Security', icon: Lock },
@@ -83,6 +145,13 @@ export default function SettingsPage() {
         </h1>
         <p className="text-gray-600 mt-1">Manage your account and preferences</p>
       </div>
+
+      {error && (
+        <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md flex items-center gap-2">
+          <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <span className="text-sm">{error}</span>
+        </div>
+      )}
 
       <div className="flex flex-col md:flex-row gap-6">
         {/* Sidebar */}
@@ -161,10 +230,11 @@ export default function SettingsPage() {
 
                 <button
                   type="submit"
-                  className="flex items-center gap-2 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                  disabled={loading}
+                  className="flex items-center gap-2 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
                 >
                   <Save className="w-4 h-4" />
-                  Save Changes
+                  {loading ? 'Saving...' : 'Save Changes'}
                 </button>
               </form>
             </div>
@@ -178,13 +248,6 @@ export default function SettingsPage() {
                 Change Password
               </h2>
               
-              {error && (
-                <div className="mb-4 bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md flex items-center gap-2">
-                  <AlertCircle className="w-5 h-5 flex-shrink-0" />
-                  <span className="text-sm">{error}</span>
-                </div>
-              )}
-
               {success && (
                 <div className="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md flex items-center gap-2">
                   <CheckCircle className="w-5 h-5 flex-shrink-0" />
@@ -237,14 +300,26 @@ export default function SettingsPage() {
                 Notification Preferences
               </h2>
               
-              <div className="space-y-4">
+              {notifSaved && (
+                <div className="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md flex items-center gap-2">
+                  <CheckCircle className="w-5 h-5 flex-shrink-0" />
+                  <span className="text-sm">Preferences saved!</span>
+                </div>
+              )}
+
+              <form onSubmit={handleNotifSave} className="space-y-4">
                 <div className="flex items-center justify-between py-3 border-b border-gray-100">
                   <div>
                     <p className="font-medium text-gray-900">Contract Renewal Alerts</p>
-                    <p className="text-sm text-gray-500">Get notified before contracts expire</p>
+                    <p className="text-sm text-gray-500">Get email reminders before contracts renew (7, 30, 60 days)</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" defaultChecked className="sr-only peer" />
+                    <input 
+                      type="checkbox" 
+                      checked={notifPrefs.email_reminders_enabled}
+                      onChange={(e) => setNotifPrefs({...notifPrefs, email_reminders_enabled: e.target.checked})}
+                      className="sr-only peer" 
+                    />
                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
                   </label>
                 </div>
@@ -252,10 +327,15 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between py-3 border-b border-gray-100">
                   <div>
                     <p className="font-medium text-gray-900">Analysis Complete</p>
-                    <p className="text-sm text-gray-500">Notify when AI analysis finishes</p>
+                    <p className="text-sm text-gray-500">Notify when AI contract analysis finishes</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" defaultChecked className="sr-only peer" />
+                    <input 
+                      type="checkbox" 
+                      checked={notifPrefs.analysis_notifications}
+                      onChange={(e) => setNotifPrefs({...notifPrefs, analysis_notifications: e.target.checked})}
+                      className="sr-only peer" 
+                    />
                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
                   </label>
                 </div>
@@ -263,14 +343,28 @@ export default function SettingsPage() {
                 <div className="flex items-center justify-between py-3">
                   <div>
                     <p className="font-medium text-gray-900">Weekly Summary</p>
-                    <p className="text-sm text-gray-500">Receive weekly contract overview</p>
+                    <p className="text-sm text-gray-500">Receive weekly overview of your contracts</p>
                   </div>
                   <label className="relative inline-flex items-center cursor-pointer">
-                    <input type="checkbox" className="sr-only peer" />
+                    <input 
+                      type="checkbox" 
+                      checked={notifPrefs.weekly_summary_enabled}
+                      onChange={(e) => setNotifPrefs({...notifPrefs, weekly_summary_enabled: e.target.checked})}
+                      className="sr-only peer" 
+                    />
                     <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-primary-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary-600"></div>
                   </label>
                 </div>
-              </div>
+
+                <button
+                  type="submit"
+                  disabled={notifLoading}
+                  className="flex items-center gap-2 px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50"
+                >
+                  <Save className="w-4 h-4" />
+                  {notifLoading ? 'Saving...' : 'Save Preferences'}
+                </button>
+              </form>
             </div>
           )}
 
