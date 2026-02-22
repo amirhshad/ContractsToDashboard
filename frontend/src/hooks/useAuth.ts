@@ -48,5 +48,12 @@ export function useAuth() {
     return { error }
   }
 
-  return { user, loading, signIn, signUp, signOut, updatePassword }
+  const updateProfile = async (data: { display_name?: string; company?: string }): Promise<{ error: AuthError | null }> => {
+    const { error } = await supabase.auth.updateUser({
+      data
+    })
+    return { error }
+  }
+
+  return { user, loading, signIn, signUp, signOut, updatePassword, updateProfile }
 }

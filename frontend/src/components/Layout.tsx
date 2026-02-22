@@ -11,6 +11,9 @@ export default function Layout({ children }: LayoutProps) {
   const { signOut, user } = useAuth()
   const location = useLocation()
 
+  // Get display name from user metadata or fallback to email name
+  const displayName = user?.user_metadata?.display_name || user?.email?.split('@')[0] || 'User'
+
   const navItems = [
     { path: '/', icon: LayoutDashboard, label: 'Dashboard', mobileLabel: 'Home' },
     { path: '/upload', icon: Upload, label: 'Upload', mobileLabel: 'Upload' },
@@ -49,7 +52,7 @@ export default function Layout({ children }: LayoutProps) {
               </nav>
             </div>
             <div className="flex items-center space-x-4">
-              <span className="text-sm text-gray-600">{user?.email}</span>
+              <span className="text-sm font-medium text-gray-700">{displayName}</span>
               <button
                 onClick={signOut}
                 className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"

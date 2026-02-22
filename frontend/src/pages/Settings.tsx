@@ -5,7 +5,7 @@ import { Settings, Lock, Save, AlertCircle, CheckCircle, User, Bell, Trash2, Bui
 type Section = 'profile' | 'security' | 'notifications' | 'danger'
 
 export default function SettingsPage() {
-  const { updatePassword, user } = useAuth()
+  const { updatePassword, updateProfile, user } = useAuth()
   const [activeSection, setActiveSection] = useState<Section>('profile')
   
   // Password state
@@ -15,9 +15,9 @@ export default function SettingsPage() {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
 
-  // Profile state
-  const [displayName, setDisplayName] = useState('')
-  const [company, setCompany] = useState('')
+  // Profile state - load from user metadata
+  const [displayName, setDisplayName] = useState(user?.user_metadata?.display_name || '')
+  const [company, setCompany] = useState(user?.user_metadata?.company || '')
   const [profileSaved, setProfileSaved] = useState(false)
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
@@ -50,10 +50,21 @@ export default function SettingsPage() {
     }
   }
 
-  const handleProfileSave = (e: React.FormEvent) => {
+  const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault()
-    setProfileSaved(true)
-    setTimeout(() => setProfileSaved(false), 3000)
+    setLoading(true)
+    setError(null)
+    try {
+      const { error } = await updateProfile({ display_name: displayName, company })
+      if (error) {
+        setError(error.message)
+      } else {
+        setProfileSaved(true)
+        setTimeout(() => setProfileSaved(false), 3000)
+      }
+    } finally {
+      setLoading(false)
+    }
   }
 
   const sections = [
