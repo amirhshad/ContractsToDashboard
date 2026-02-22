@@ -49,13 +49,6 @@ export default function Layout({ children }: LayoutProps) {
               </nav>
             </div>
             <div className="flex items-center space-x-4">
-              <Link
-                to="/settings"
-                className="flex items-center space-x-2 px-3 py-2 text-sm text-gray-600 hover:text-gray-900 transition-colors"
-              >
-                <Settings className="w-4 h-4" />
-                <span className="hidden sm:inline">Settings</span>
-              </Link>
               <span className="text-sm text-gray-600">{user?.email}</span>
               <button
                 onClick={signOut}
