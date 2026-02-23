@@ -37,44 +37,50 @@ export default function Login() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-md w-full space-y-8">
+    <div className="min-h-screen flex items-center justify-center bg-[#0a0a0f] py-12 px-4">
+      {/* Background effects */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-0 left-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-blue-500/10 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="max-w-md w-full relative z-10">
         <div>
-          <Link to="/" className="flex items-center justify-center gap-2 mb-4 text-gray-500 hover:text-gray-700">
+          <Link to="/" className="flex items-center justify-center gap-2 mb-6 text-gray-400 hover:text-white transition-colors">
             <span>← Back to home</span>
           </Link>
-          <div className="flex items-center justify-center gap-2">
-            <div className="w-8 h-8 bg-primary-600 rounded-lg flex items-center justify-center">
-              <span className="text-white font-bold text-lg">C</span>
+          <div className="flex items-center justify-center gap-3 mb-6">
+            <div className="w-12 h-12 bg-gradient-to-br from-purple-500 to-blue-500 rounded-2xl flex items-center justify-center">
+              <span className="text-white font-bold text-2xl">C</span>
             </div>
-            <h1 className="text-center text-3xl font-bold text-primary-600">
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-white to-gray-400 bg-clip-text text-transparent">
               Clausemate
             </h1>
           </div>
-          <h2 className="mt-6 text-center text-2xl font-bold text-gray-900">
-            {isSignUp ? 'Create your account' : 'Sign in to your account'}
+          <h2 className="text-center text-2xl font-bold text-white mb-2">
+            {isSignUp ? 'Create your account' : 'Welcome back'}
           </h2>
-          <p className="mt-2 text-center text-sm text-gray-600">
+          <p className="text-center text-gray-400 mb-8">
             Manage your contracts and get AI-powered recommendations
           </p>
         </div>
 
-        <form className="mt-8 space-y-6" onSubmit={handleSubmit}>
+        <form className="space-y-6" onSubmit={handleSubmit}>
           {error && (
-            <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md text-sm">
+            <div className="bg-red-500/10 border border-red-500/20 text-red-400 px-4 py-3 rounded-xl text-sm">
               {error}
             </div>
           )}
 
           {message && (
-            <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md text-sm">
+            <div className="bg-green-500/10 border border-green-500/20 text-green-400 px-4 py-3 rounded-xl text-sm">
               {message}
             </div>
           )}
 
           <div className="space-y-4">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
                 Email address
               </label>
               <input
@@ -85,13 +91,13 @@ export default function Login() {
                 required
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 placeholder="you@example.com"
               />
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-gray-700">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
                 Password
               </label>
               <input
@@ -103,21 +109,19 @@ export default function Login() {
                 minLength={6}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                 placeholder="••••••••"
               />
             </div>
           </div>
 
-          <div>
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {loading ? 'Loading...' : isSignUp ? 'Sign up' : 'Sign in'}
-            </button>
-          </div>
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full flex justify-center py-3 px-4 bg-gradient-to-r from-purple-500 to-blue-500 text-white font-semibold rounded-xl hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:ring-offset-[#0a0a0f] disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+          >
+            {loading ? 'Loading...' : isSignUp ? 'Create Account' : 'Sign In'}
+          </button>
 
           <div className="text-center">
             <button
@@ -127,7 +131,7 @@ export default function Login() {
                 setError(null)
                 setMessage(null)
               }}
-              className="text-sm text-primary-600 hover:text-primary-500"
+              className="text-sm text-gray-400 hover:text-white transition-colors"
             >
               {isSignUp
                 ? 'Already have an account? Sign in'
