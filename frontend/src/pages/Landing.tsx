@@ -1,5 +1,5 @@
 import { Link } from 'react-router-dom'
-import { FileText, Sparkles, Calendar, Search, TrendingDown, ArrowRight, CheckCircle, Zap, Shield, Clock } from 'lucide-react'
+import { FileText, Sparkles, Calendar, Search, TrendingDown, ArrowRight, CheckCircle, Clock } from 'lucide-react'
 
 export default function Landing() {
   return (
