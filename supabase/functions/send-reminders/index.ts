@@ -31,15 +31,22 @@ Deno.serve(async (req) => {
     let emailsSent = 0
 
     if (type === 'weekly') {
-      // Weekly summary
-      const { data: users } = await supabase
+      // Weekly summary - get users with weekly summary enabled
+      const { data: prefs } = await supabase
         .from('user_notification_preferences')
-        .select('user_id, user:users(email, user_metadata)')
+        .select('user_id, email_reminders_enabled, weekly_summary_enabled')
         .eq('weekly_summary_enabled', true)
 
-      for (const userPref of users || []) {
-        const userEmail = userPref.user?.email
-        const userName = userPref.user?.user_metadata?.display_name || 'there'
+      for (const userPref of prefs || []) {
+        // Get user email separately from auth.users
+        const { data: userData } = await supabase
+          .from('auth.users')
+          .select('email, raw_user_meta_data')
+          .eq('id', userPref.user_id)
+          .single()
+        
+        const userEmail = userData?.email
+        const userName = userData?.raw_user_meta_data?.display_name || 'there'
         if (!userEmail) continue
 
         // Get contract stats
@@ -85,14 +92,14 @@ Deno.serve(async (req) => {
           ${upcomingRenewals.length > 0 ? `
           <h3>📅 Upcoming Renewals (30 days)</h3>
           <ul>
-            ${upcomingRenewals.map(c => `<li><strong>${c.provider_name}</strong> - ${c.contract_type} - $${c.monthly_cost}/${c.currency === 'USD' ? 'mo' : c.currency}</li>`).join('')}
+            ${upcomingRenewals.map(c => `<li><strong>${c.provider_name}</strong> - ${c.contract_type || 'contract'} - $${c.monthly_cost}</li>`).join('')}
           </ul>
           ` : ''}
           
           ${pendingRecommendations > 0 ? `
           <h3>💡 AI Recommendations</h3>
           <p>You have <strong>${pendingRecommendations}</strong> pending recommendations${costSavings > 0 ? ` that could save you <strong>$${costSavings}</strong>` : ''}.</p>
-          ` : ''}
+          ` : '<p>No pending recommendations. Great job keeping on top of your contracts!</p>'}
           
           <p><a href="https://clausemate.vercel.app">View all contracts →</a></p>
         `
@@ -117,14 +124,21 @@ Deno.serve(async (req) => {
 
     } else {
       // Renewal reminders (default)
-      const { data: users } = await supabase
+      const { data: prefs } = await supabase
         .from('user_notification_preferences')
-        .select('user_id, user:users(email, user_metadata)')
+        .select('user_id, email_reminders_enabled')
         .eq('email_reminders_enabled', true)
 
-      for (const userPref of users || []) {
-        const userEmail = userPref.user?.email
-        const userName = userPref.user?.user_metadata?.display_name || 'there'
+      for (const userPref of prefs || []) {
+        // Get user email separately
+        const { data: userData } = await supabase
+          .from('auth.users')
+          .select('email, raw_user_meta_data')
+          .eq('id', userPref.user_id)
+          .single()
+        
+        const userEmail = userData?.email
+        const userName = userData?.raw_user_meta_data?.display_name || 'there'
         if (!userEmail) continue
 
         const { data: renewals } = await supabase
@@ -155,7 +169,7 @@ Deno.serve(async (req) => {
         if (urgent.length > 0) {
           html += `<h3>⚠️ Urgent - Renewals this week</h3><ul>`
           for (const c of urgent) {
-            html += `<li><strong>${c.provider_name}</strong> - ${c.contract_type} - $${c.monthly_cost}/${c.currency === 'USD' ? 'mo' : c.currency}</li>`
+            html += `<li><strong>${c.provider_name}</strong> - ${c.contract_type || 'contract'} - $${c.monthly_cost}</li>`
           }
           html += `</ul>`
         }
@@ -163,7 +177,7 @@ Deno.serve(async (req) => {
         if (upcoming.length > 0) {
           html += `<h3>📅 Coming up in 30 days</h3><ul>`
           for (const c of upcoming) {
-            html += `<li><strong>${c.provider_name}</strong> - ${c.contract_type} - $${c.monthly_cost}/${c.currency === 'USD' ? 'mo' : c.currency}</li>`
+            html += `<li><strong>${c.provider_name}</strong> - ${c.contract_type || 'contract'} - $${c.monthly_cost}</li>`
           }
           html += `</ul>`
         }
@@ -171,7 +185,7 @@ Deno.serve(async (req) => {
         if (later.length > 0) {
           html += `<h3>📆 Later (60+ days)</h3><ul>`
           for (const c of later.slice(0, 5)) {
-            html += `<li><strong>${c.provider_name}</strong> - ${c.contract_type}</li>`
+            html += `<li><strong>${c.provider_name}</strong> - ${c.contract_type || 'contract'}</li>`
           }
           if (later.length > 5) html += `<li>...and ${later.length - 5} more</li>`
           html += `</ul>`

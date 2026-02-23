@@ -1,6 +1,7 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './hooks/useAuth'
 import Login from './pages/Login'
+import Landing from './pages/Landing'
 import Dashboard from './pages/Dashboard'
 import Upload from './pages/Upload'
 import Contracts from './pages/Contracts'
@@ -21,10 +22,18 @@ function App() {
     )
   }
 
+  // Public routes (no auth required)
   if (!user) {
-    return <Login />
+    return (
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    )
   }
 
+  // Authenticated routes
   return (
     <Layout>
       <Routes>
