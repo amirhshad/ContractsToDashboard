@@ -569,7 +569,7 @@ def extract_with_claude(files, files_metadata):
     })
 
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-opus-4-20251115",
         max_tokens=4096,
         messages=[{
             "role": "user",
@@ -672,7 +672,7 @@ Focus on:
 Provide 2-5 specific, actionable recommendations per contract. Return ONLY valid JSON."""
 
     response = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-opus-4-20251115",
         max_tokens=4096,
         messages=[{"role": "user", "content": prompt}]
     )
@@ -1306,7 +1306,7 @@ Respond with ONLY valid JSON, no other text."""
                 client = anthropic.Anthropic(api_key=ANTHROPIC_API_KEY)
 
                 message = client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-opus-4-20251115",
                     max_tokens=1024,
                     messages=[
                         {"role": "user", "content": prompt}

@@ -60,7 +60,7 @@ def extract_contract_data(pdf_bytes: bytes, api_key: str) -> dict[str, Any]:
 
     # Call Claude with the PDF
     message = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-opus-4-20251115",
         max_tokens=2048,
         messages=[
             {

@@ -96,7 +96,7 @@ def generate_recommendations(
     )
 
     message = client.messages.create(
-        model="claude-sonnet-4-20250514",
+        model="claude-opus-4-20251115",
         max_tokens=4096,
         messages=[
             {
