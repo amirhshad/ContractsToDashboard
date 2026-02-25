@@ -180,3 +180,23 @@ export async function updateRecommendation(
   if (!res.ok) throw new Error('Failed to update recommendation')
   return res.json()
 }
+
+// Contract Q&A API
+export interface ContractQueryResponse {
+  answer: string
+  citations: string[]
+}
+
+export async function queryContract(
+  contractId: string,
+  question: string
+): Promise<ContractQueryResponse> {
+  const headers = await getAuthHeader()
+  const res = await fetch(`${API_URL}/api/contracts/${contractId}/query`, {
+    method: 'POST',
+    headers: { ...headers, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ question }),
+  })
+  if (!res.ok) throw new Error('Failed to query contract')
+  return res.json()
+}

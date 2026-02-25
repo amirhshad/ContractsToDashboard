@@ -28,11 +28,13 @@ Extract these fields:
   "auto_renewal": "true if contract auto-renews, false if not, or null if unclear",
   "cancellation_notice_days": "Number of days notice required to cancel (integer), or null",
   "key_terms": ["List of important terms, conditions, or clauses as strings"],
+  "parties": [{"name": "Full name of party", "role": "Role (provider, client, insurer, insured, landlord, tenant, etc.)"}],
+  "risks": [{"title": "Short risk title", "description": "Description of the risk", "severity": "high, medium, or low"}],
   "confidence": "Your confidence in the extraction accuracy from 0.0 to 1.0"
 }
 
 Important:
-- If a field cannot be determined from the document, use null
+- If a field cannot be determined from the document, use null for simple fields, [] for arrays
 - For costs, extract only the numeric value without currency symbols
 - For dates, use ISO format YYYY-MM-DD
 - For confidence, estimate based on document clarity and how many fields you could extract
@@ -106,6 +108,8 @@ def extract_contract_data(pdf_bytes: bytes, api_key: str) -> dict[str, Any]:
                 "auto_renewal": None,
                 "cancellation_notice_days": None,
                 "key_terms": [],
+                "parties": [],
+                "risks": [],
                 "confidence": 0.0,
             }
 
@@ -121,6 +125,8 @@ def extract_contract_data(pdf_bytes: bytes, api_key: str) -> dict[str, Any]:
         "auto_renewal": None,
         "cancellation_notice_days": None,
         "key_terms": [],
+        "parties": [],
+        "risks": [],
         "confidence": 0.0,
     }
 

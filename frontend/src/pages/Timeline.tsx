@@ -8,6 +8,7 @@ import {
   Bell,
 } from 'lucide-react'
 import { useContracts } from '../hooks/useContracts'
+import EmptyState from '../components/EmptyState'
 
 interface TimelineEvent {
   id: string
@@ -272,9 +273,15 @@ export default function Timeline() {
           </div>
 
           {contractBars.length === 0 ? (
-            <div className="text-center py-8 text-gray-500">
-              No contracts with dates to display
-            </div>
+            contracts.length === 0 ? (
+              <div className="py-8">
+                <EmptyState type="timeline" />
+              </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                No contracts with dates to display
+              </div>
+            )
           ) : (
             contractBars.map((bar) => {
               const position = getBarPosition(bar.startDate, bar.endDate)
@@ -344,9 +351,13 @@ export default function Timeline() {
         <h2 className="font-semibold text-gray-900 mb-4">Contract Periods</h2>
 
         {contractBars.length === 0 ? (
-          <div className="text-center py-8 text-gray-500">
-            No contracts with dates to display
-          </div>
+          contracts.length === 0 ? (
+            <EmptyState type="timeline" />
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              No contracts with dates to display
+            </div>
+          )
         ) : (
           <div className="space-y-3">
             {contractBars.map((bar) => {

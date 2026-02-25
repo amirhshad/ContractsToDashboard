@@ -3,6 +3,7 @@ import { FileText, Trash2, Search, Filter, Download } from 'lucide-react'
 import { useContracts } from '../hooks/useContracts'
 import { getCurrencySymbol } from '../types'
 import type { Contract } from '../types'
+import EmptyState from '../components/EmptyState'
 
 export default function Contracts() {
   const { contracts, loading, error, deleteContract } = useContracts()
@@ -147,17 +148,19 @@ export default function Contracts() {
 
       {/* Empty state */}
       {filteredContracts.length === 0 && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
-          <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">
-            {contracts.length === 0 ? 'No contracts yet' : 'No matching contracts'}
-          </h3>
-          <p className="text-gray-600">
-            {contracts.length === 0
-              ? 'Upload your first contract to get started.'
-              : 'Try adjusting your search or filters.'}
-          </p>
-        </div>
+        contracts.length === 0 ? (
+          <EmptyState type="contracts" />
+        ) : (
+          <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
+            <Search className="w-12 h-12 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 mb-2">
+              No matching contracts
+            </h3>
+            <p className="text-gray-600">
+              Try adjusting your search or filters.
+            </p>
+          </div>
+        )
       )}
 
       {/* Contract list */}

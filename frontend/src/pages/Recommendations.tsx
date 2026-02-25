@@ -13,6 +13,7 @@ import { useContracts } from '../hooks/useContracts'
 import { getRecommendations, generateRecommendations } from '../lib/api'
 import type { Recommendation } from '../types'
 import RecommendationCard from '../components/RecommendationCard'
+import EmptyState from '../components/EmptyState'
 
 type StatusFilter = 'all' | 'pending' | 'accepted' | 'dismissed'
 type TypeFilter = 'all' | 'cost_reduction' | 'consolidation' | 'risk_alert' | 'renewal_reminder'
@@ -250,13 +251,7 @@ export default function Recommendations() {
         </div>
 
         {contracts.length === 0 ? (
-          <div className="text-center py-12">
-            <Sparkles className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No contracts yet</h3>
-            <p className="text-gray-500">
-              Upload contracts to get AI-powered recommendations.
-            </p>
-          </div>
+          <EmptyState type="recommendations" />
         ) : filteredRecommendations.length === 0 ? (
           <div className="text-center py-12">
             {recommendations.length === 0 ? (

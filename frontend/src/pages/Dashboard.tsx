@@ -14,6 +14,7 @@ import { getRecommendations, generateRecommendations } from '../lib/api'
 import type { Recommendation } from '../types'
 import RecommendationCard from '../components/RecommendationCard'
 import SpendingCharts from '../components/SpendingCharts'
+import EmptyState from '../components/EmptyState'
 
 export default function Dashboard() {
   const { contracts, summary, loading, error } = useContracts()
@@ -135,21 +136,7 @@ export default function Dashboard() {
       {contracts.length > 0 && <SpendingCharts contracts={contracts} />}
 
       {/* Empty State */}
-      {contracts.length === 0 && (
-        <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-8 text-center">
-          <FileText className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-          <h3 className="text-lg font-medium text-gray-900 mb-2">No contracts yet</h3>
-          <p className="text-gray-600 mb-4">
-            Upload your first contract to start getting AI-powered recommendations.
-          </p>
-          <Link
-            to="/upload"
-            className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700"
-          >
-            Upload Contract
-          </Link>
-        </div>
-      )}
+      {contracts.length === 0 && <EmptyState type="dashboard" />}
 
       {/* Recommendations Section */}
       {contracts.length > 0 && (

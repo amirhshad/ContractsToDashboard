@@ -12,6 +12,7 @@ import {
   Clock
 } from 'lucide-react'
 import { getContract, getContracts } from '../lib/api'
+import ContractQA from '../components/ContractQA'
 import type { Contract, ContractParty, ContractRisk } from '../types'
 
 export default function ContractDetail() {
@@ -295,6 +296,9 @@ export default function ContractDetail() {
               </div>
             </div>
           )}
+
+          {/* Q&A Section */}
+          <ContractQA contractId={contract.id} />
         </>
       )}
 

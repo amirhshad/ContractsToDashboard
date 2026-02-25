@@ -1,6 +1,7 @@
 """File upload and contract extraction endpoints."""
 
 import base64
+import json
 import logging
 import traceback
 from typing import Optional
@@ -86,6 +87,9 @@ async def confirm_extraction(
     end_date: Optional[str] = None,
     auto_renewal: bool = True,
     cancellation_notice_days: Optional[int] = None,
+    key_terms: Optional[str] = None,
+    parties: Optional[str] = None,
+    risks: Optional[str] = None,
     user_id: str = Depends(get_user_id),
     supabase: Client = Depends(get_supabase),
 ):
@@ -149,6 +153,25 @@ async def confirm_extraction(
         "file_name": file.filename,
         "user_verified": True,
     }
+
+    # Add key_terms, parties, and risks if provided (JSON strings from form data)
+    if key_terms:
+        try:
+            contract_data["key_terms"] = json.loads(key_terms) if isinstance(key_terms, str) else key_terms
+        except (json.JSONDecodeError, TypeError):
+            pass  # Skip if invalid JSON
+
+    if parties:
+        try:
+            contract_data["parties"] = json.loads(parties) if isinstance(parties, str) else parties
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    if risks:
+        try:
+            contract_data["risks"] = json.loads(risks) if isinstance(risks, str) else risks
+        except (json.JSONDecodeError, TypeError):
+            pass
 
     # Remove None values
     contract_data = {k: v for k, v in contract_data.items() if v is not None}

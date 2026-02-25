@@ -1,8 +1,12 @@
 """Contract management endpoints."""
 
+import json
+import os
 from datetime import date, timedelta
 from decimal import Decimal
 from typing import Optional
+
+import anthropic
 from fastapi import APIRouter, Depends, HTTPException, Header
 from supabase import create_client, Client
 
@@ -15,6 +19,20 @@ from backend.models import (
 )
 
 router = APIRouter()
+
+
+from pydantic import BaseModel
+from typing import Optional
+
+
+# Q&A Request/Response models
+class ContractQuery(BaseModel):
+    question: str
+
+
+class ContractQueryResponse(BaseModel):
+    answer: str
+    citations: list[str]
 
 
 def get_supabase(settings: Settings = Depends(get_settings)) -> Client:
@@ -197,3 +215,116 @@ async def delete_contract(
     supabase.table("contracts").delete().eq("id", contract_id).execute()
 
     return {"status": "deleted"}
+
+
+@router.post("/{contract_id}/query", response_model=ContractQueryResponse)
+async def query_contract(
+    contract_id: str,
+    query: ContractQuery,
+    user_id: str = Depends(get_user_id),
+    supabase: Client = Depends(get_supabase),
+    settings: Settings = Depends(get_settings),
+):
+    """Ask a question about a contract and get an AI-powered answer with citations."""
+    # Fetch the contract
+    result = (
+        supabase.table("contracts")
+        .select("*")
+        .eq("id", contract_id)
+        .eq("user_id", user_id)
+        .single()
+        .execute()
+    )
+
+    if not result.data:
+        raise HTTPException(status_code=404, detail="Contract not found")
+
+    contract = result.data
+
+    # Build context from contract data
+    key_terms = contract.get("key_terms", [])
+    if isinstance(key_terms, str):
+        try:
+            key_terms = json.loads(key_terms)
+        except json.JSONDecodeError:
+            key_terms = [key_terms] if key_terms else []
+
+    parties = contract.get("parties", [])
+    if isinstance(parties, str):
+        try:
+            parties = json.loads(parties)
+        except json.JSONDecodeError:
+            parties = []
+
+    risks = contract.get("risks", [])
+    if isinstance(risks, str):
+        try:
+            risks = json.loads(risks)
+        except json.JSONDecodeError:
+            risks = []
+
+    # Format the prompt
+    prompt = f"""You are a contract analyst assistant. Your job is to answer questions about contracts based on the extracted data.
+
+## Contract Information
+
+**Provider:** {contract.get('provider_name', 'Unknown')}
+**Type:** {contract.get('contract_type', 'Unknown')}
+**Monthly Cost:** ${contract.get('monthly_cost', 'Not specified') or 'Not specified'}
+**Annual Cost:** ${contract.get('annual_cost', 'Not specified') or 'Not specified'}
+**Payment Frequency:** {contract.get('payment_frequency', 'Not specified') or 'Not specified'}
+**Start Date:** {contract.get('start_date', 'Not specified') or 'Not specified'}
+**End Date:** {contract.get('end_date', 'Not specified') or 'Not specified'}
+**Auto-Renewal:** {'Yes' if contract.get('auto_renewal') else 'No'}
+**Cancellation Notice:** {contract.get('cancellation_notice_days', 'Not specified') or 'Not specified'} days
+
+**Key Terms:**
+{chr(10).join(f"- {term}" for term in key_terms) if key_terms else "None extracted"}
+
+**Parties:**
+{chr(10).join(f"- {p.get('name', 'Unknown')} ({p.get('role', 'Unknown role')})" for p in parties) if parties else "None extracted"}
+
+**Risks:**
+{chr(10).join(f"- {r.get('title', 'Unknown')}: {r.get('description', '')}" for r in risks) if risks else "None identified"}
+
+## Question
+{query.question}
+
+## Instructions
+1. Answer the question based ONLY on the contract data provided
+2. If the question cannot be answered from the available data, say so clearly
+3. Provide specific citations from the contract data when possible
+4. Be concise but thorough
+5. Use plain language, avoiding legal jargon where possible
+
+## Response Format
+Return a JSON object with:
+- "answer": Your answer to the question
+- "citations": Array of specific quotes/text that support your answer (empty if not applicable)
+
+Respond with ONLY valid JSON, no other text."""
+
+    # Call Claude API
+    client = anthropic.Anthropic(api_key=settings.anthropic_api_key)
+
+    message = client.messages.create(
+        model="claude-sonnet-4-20250514",
+        max_tokens=1024,
+        messages=[
+            {"role": "user", "content": prompt}
+        ]
+    )
+
+    response_text = message.content[0].text
+
+    # Parse the JSON response
+    try:
+        response_data = json.loads(response_text)
+        answer = response_data.get("answer", "Sorry, I couldn't parse the answer.")
+        citations = response_data.get("citations", [])
+    except json.JSONDecodeError:
+        # If JSON parsing fails, return the raw response
+        answer = response_text
+        citations = []
+
+    return ContractQueryResponse(answer=answer, citations=citations)
