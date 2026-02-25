@@ -407,6 +407,9 @@ def parse_extraction_result(raw_data: dict) -> dict:
         "complexity": raw_data.get("complexity", "medium"),
         "complexity_reasons": raw_data.get("complexity_reasons", []),
         "documents_analyzed": raw_data.get("documents_analyzed", []),
+        # RAG fields
+        "full_text": raw_data.get("full_text", ""),
+        "chunks": raw_data.get("chunks", []),
     }
 
     # Parse numeric fields
@@ -1000,6 +1003,8 @@ class handler(BaseHTTPRequestHandler):
                     "parties": parties,
                     "risks": risks,
                     "user_verified": True,
+                    # RAG fields
+                    "full_text": extraction.get("full_text", ""),
                 }
 
                 # For backward compatibility, set file_path and file_name from first file
@@ -1011,6 +1016,20 @@ class handler(BaseHTTPRequestHandler):
 
                 result = supabase.table("contracts").insert(contract_data).execute()
                 contract_id = result.data[0]["id"]
+
+                # Insert text chunks for RAG
+                chunks = extraction.get("chunks", [])
+                if chunks:
+                    for chunk in chunks:
+                        try:
+                            supabase.table("contract_chunks").insert({
+                                "contract_id": contract_id,
+                                "chunk_text": chunk.get("text", ""),
+                                "chunk_index": chunk.get("index", 0),
+                                "source_file": files[0]["filename"] if files else None,
+                            })
+                        except Exception:
+                            pass  # Skip chunk insertion errors
 
                 # Upload each file to storage and create contract_files records
                 for i, file_data in enumerate(files):
@@ -1237,6 +1256,52 @@ class handler(BaseHTTPRequestHandler):
             if not question:
                 return self.send_error_json("Question is required", 400)
 
+            # RAG: Retrieve relevant chunks from the database
+            full_text = contract.get("full_text", "")
+            chunks = []
+            
+            # Try to get chunks from contract_chunks table
+            try:
+                chunks_result = supabase.table("contract_chunks").select("*").eq("contract_id", contract_id).order("chunk_index").execute()
+                chunks = [c.get("chunk_text", "") for c in chunks_result.data if c.get("chunk_text")]
+            except Exception:
+                # Fallback: use full_text if no chunks
+                pass
+
+            # If no chunks in DB but we have full_text, create chunks on-the-fly
+            if not chunks and full_text:
+                # Simple chunking by paragraphs
+                paragraphs = [p.strip() for p in full_text.split("\n\n") if p.strip()]
+                chunks = paragraphs[:20]  # Limit to first 20 paragraphs
+
+            # Retrieve relevant chunks using keyword matching
+            def find_relevant_chunks(question: str, chunks: list, top_k: int = 5) -> list:
+                """Find chunks relevant to the question using keyword matching."""
+                if not chunks:
+                    return []
+                
+                # Extract keywords from question
+                question_lower = question.lower()
+                keywords = [w for w in question_lower.split() if len(w) > 3]
+                
+                # Score each chunk
+                scored = []
+                for i, chunk in enumerate(chunks):
+                    chunk_lower = chunk.lower()
+                    score = 0
+                    for kw in keywords:
+                        score += chunk_lower.count(kw) * 2
+                    # Boost chunks that are shorter (more focused)
+                    if len(chunk) < 500:
+                        score *= 1.2
+                    scored.append((i, score, chunk))
+                
+                # Sort by score and return top_k
+                scored.sort(key=lambda x: x[1], reverse=True)
+                return [c[2] for c in scored[:top_k] if c[1] > 0]
+
+            relevant_chunks = find_relevant_chunks(question, chunks)
+
             # Build context from contract data
             key_terms = contract.get("key_terms", [])
             if isinstance(key_terms, str):
@@ -1259,44 +1324,57 @@ class handler(BaseHTTPRequestHandler):
                 except:
                     risks = []
 
+            # Build RAG prompt with retrieved chunks
+            context_parts = []
+
+            # Add structured data
+            context_parts.append(f"""## Contract Details
+- **Provider:** {contract.get('provider_name', 'Unknown')}
+- **Type:** {contract.get('contract_type', 'Unknown')}
+- **Monthly Cost:** ${contract.get('monthly_cost', 'Not specified') or 'Not specified'}
+- **Annual Cost:** ${contract.get('annual_cost', 'Not specified') or 'Not specified'}
+- **Payment Frequency:** {contract.get('payment_frequency', 'Not specified') or 'Not specified'}
+- **Start Date:** {contract.get('start_date', 'Not specified') or 'Not specified'}
+- **End Date:** {contract.get('end_date', 'Not specified') or 'Not specified'}
+- **Auto-Renewal:** {'Yes' if contract.get('auto_renewal') else 'No'}
+- **Cancellation Notice:** {contract.get('cancellation_notice_days', 'Not specified') or 'Not specified'} days""")
+
+            if key_terms:
+                context_parts.append(f"""## Key Terms
+{chr(10).join(f"- {term}" for term in key_terms)}""")
+
+            if parties:
+                context_parts.append(f"""## Parties
+{chr(10).join(f"- {p.get('name', 'Unknown')} ({p.get('role', 'Unknown role')})" for p in parties)}""")
+
+            if risks:
+                context_parts.append(f"""## Identified Risks
+{chr(10).join(f"- {r.get('title', 'Unknown')}: {r.get('description', '')}" for r in risks)}""")
+
+            # Add relevant document chunks (RAG)
+            if relevant_chunks:
+                context_parts.append(f"""## Relevant Document Sections
+{chr(10).join(f"[Section {i+1}] {chunk[:500]}" for i, chunk in enumerate(relevant_chunks))}""")
+
             # Format the prompt
-            prompt = f"""You are a contract analyst assistant. Your job is to answer questions about contracts based on the extracted data.
+            prompt = f"""You are a contract analyst assistant. Your job is to answer questions about contracts based on the provided context.
 
-## Contract Information
-
-**Provider:** {contract.get('provider_name', 'Unknown')}
-**Type:** {contract.get('contract_type', 'Unknown')}
-**Monthly Cost:** ${contract.get('monthly_cost', 'Not specified') or 'Not specified'}
-**Annual Cost:** ${contract.get('annual_cost', 'Not specified') or 'Not specified'}
-**Payment Frequency:** {contract.get('payment_frequency', 'Not specified') or 'Not specified'}
-**Start Date:** {contract.get('start_date', 'Not specified') or 'Not specified'}
-**End Date:** {contract.get('end_date', 'Not specified') or 'Not specified'}
-**Auto-Renewal:** {'Yes' if contract.get('auto_renewal') else 'No'}
-**Cancellation Notice:** {contract.get('cancellation_notice_days', 'Not specified') or 'Not specified'} days
-
-**Key Terms:**
-{chr(10).join(f"- {term}" for term in key_terms) if key_terms else "None extracted"}
-
-**Parties:**
-{chr(10).join(f"- {p.get('name', 'Unknown')} ({p.get('role', 'Unknown role')})" for p in parties) if parties else "None extracted"}
-
-**Risks:**
-{chr(10).join(f"- {r.get('title', 'Unknown')}: {r.get('description', '')}" for r in risks) if risks else "None identified"}
+{chr(10).join(context_parts)}
 
 ## Question
 {question}
 
 ## Instructions
-1. Answer the question based ONLY on the contract data provided
+1. Answer the question based ONLY on the contract data and document sections provided
 2. If the question cannot be answered from the available data, say so clearly
-3. Provide specific citations from the contract data when possible
+3. Provide specific citations from the document sections when possible
 4. Be concise but thorough
 5. Use plain language, avoiding legal jargon where possible
 
 ## Response Format
 Return a JSON object with:
 - "answer": Your answer to the question
-- "citations": Array of specific quotes/text that support your answer (empty if not applicable)
+- "citations": Array of specific quotes/text that support your answer (use the [Section X] format if citing from document)
 
 Respond with ONLY valid JSON, no other text."""
 

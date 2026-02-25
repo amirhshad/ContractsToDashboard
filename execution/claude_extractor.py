@@ -41,6 +41,63 @@ Important:
 - Return ONLY the JSON object, no markdown formatting or explanation
 """
 
+FULL_TEXT_PROMPT = """Extract ALL text content from this contract document.
+- Return the complete text, preserving paragraph structure
+- Include all sections, clauses, headers, and details
+- Do NOT summarize - return as much original text as possible
+- Format as a clean, readable text version of the document
+
+Return as JSON:
+{
+  "full_text": "the complete extracted text here..."
+}"""
+
+
+def extract_full_text(pdf_bytes: bytes, api_key: str) -> str:
+    """Extract full text from a PDF using Claude Vision API."""
+    client = anthropic.Anthropic(api_key=api_key)
+
+    # Encode PDF as base64
+    pdf_base64 = base64.standard_b64encode(pdf_bytes).decode("utf-8")
+
+    # Call Claude with the PDF
+    message = client.messages.create(
+        model="claude-opus-4-20251115",
+        max_tokens=8192,
+        messages=[
+            {
+                "role": "user",
+                "content": [
+                    {
+                        "type": "document",
+                        "source": {
+                            "type": "base64",
+                            "media_type": "application/pdf",
+                            "data": pdf_base64,
+                        },
+                    },
+                    {
+                        "type": "text",
+                        "text": FULL_TEXT_PROMPT,
+                    },
+                ],
+            }
+        ],
+    )
+
+    response_text = message.content[0].text
+
+    # Try to extract JSON
+    try:
+        data = json.loads(response_text)
+        return data.get("full_text", "")
+    except json.JSONDecodeError:
+        # Try to find JSON in response
+        json_match = re.search(r'\{"full_text":\s*"(.+?)"\}', response_text, re.DOTALL)
+        if json_match:
+            return json_match.group(1)
+        return response_text  # Return raw text as fallback
+
 
 def extract_contract_data(pdf_bytes: bytes, api_key: str) -> dict[str, Any]:
     """
@@ -128,12 +185,87 @@ def extract_contract_data(pdf_bytes: bytes, api_key: str) -> dict[str, Any]:
         "parties": [],
         "risks": [],
         "confidence": 0.0,
+        "full_text": "",
     }
 
     for key, default in defaults.items():
         if key not in result:
             result[key] = default
 
+    return result
+
+
+def chunk_text(text: str, chunk_size: int = 1000, overlap: int = 100) -> list[dict]:
+    """
+    Split text into overlapping chunks for RAG.
+    
+    Args:
+        text: Full text to chunk
+        chunk_size: Maximum characters per chunk
+        overlap: Number of overlapping characters between chunks
+    
+    Returns:
+        List of chunks with text and metadata
+    """
+    if not text:
+        return []
+    
+    chunks = []
+    start = 0
+    text_length = len(text)
+    chunk_index = 0
+    
+    while start < text_length:
+        end = start + chunk_size
+        
+        # Try to break at sentence boundary
+        if end < text_length:
+            # Look for sentence endings near chunk boundary
+            for punct in ['. ', '! ', '? ', '\n']:
+                last_punct = text.rfind(punct, start, end)
+                if last_punct > start + chunk_size // 2:
+                    end = last_punct + 1
+                    break
+        
+        chunk_text = text[start:end].strip()
+        if chunk_text:
+            chunks.append({
+                "text": chunk_text,
+                "index": chunk_index,
+                "char_start": start,
+                "char_end": min(end, text_length)
+            })
+            chunk_index += 1
+        
+        start = end - overlap
+        if start <= 0:
+            break
+    
+    return chunks
+
+
+def extract_contract_with_rag(pdf_bytes: bytes, api_key: str) -> dict[str, Any]:
+    """
+    Extract contract data including full text for RAG.
+    
+    Args:
+        pdf_bytes: Raw PDF file bytes
+        api_key: Anthropic API key
+    
+    Returns:
+        Dictionary with extracted data + full_text + chunks
+    """
+    # First extract structured data
+    result = extract_contract_data(pdf_bytes, api_key)
+    
+    # Then extract full text
+    full_text = extract_full_text(pdf_bytes, api_key)
+    result["full_text"] = full_text
+    
+    # Create chunks
+    chunks = chunk_text(full_text)
+    result["chunks"] = chunks
+    
     return result
 
 
